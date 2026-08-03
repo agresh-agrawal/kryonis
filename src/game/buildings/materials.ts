@@ -96,17 +96,31 @@ export class MaterialLibrary {
         metalness: 0.92,
       }),
 
-      // Machinery, seals, tyres, radiator backs.
+      /*
+       * Machinery, seals, tyres, radiator backs.
+       *
+       * Carries the shared detail normal rather than a colour map of its own.
+       * Flat-shaded dark grey reads as untextured plastic under the low sun
+       * angle this game spends most of its time in, and the normal is already
+       * resident for hull and metal - so this costs one sampler on this
+       * material and no additional texture memory at all.
+       */
       dark: new THREE.MeshStandardMaterial({
         color: '#33363b',
+        normalMap: detailNormal,
+        normalScale: new THREE.Vector2(0.3, 0.3),
         roughness: 0.68,
         metalness: 0.45,
       }),
 
       // Multi-layer insulation blanket. The single most recognisable piece of
-      // spacecraft visual language there is.
+      // spacecraft visual language there is - and the one that suffers most
+      // from being flat, because real MLI is never flat. The normal is pushed
+      // hard here deliberately: the crinkle *is* the material.
       gold: new THREE.MeshStandardMaterial({
         color: '#caa53d',
+        normalMap: detailNormal,
+        normalScale: new THREE.Vector2(0.85, 0.85),
         roughness: 0.3,
         metalness: 1,
       }),
@@ -167,9 +181,13 @@ export class MaterialLibrary {
         metalness: 0,
       }),
 
-      // Planting beds inside greenhouses - the only green on the planet.
+      // Planting beds inside greenhouses - the only green on the planet, and
+      // the one surface that should read as loose and broken up rather than
+      // moulded.
       soil: new THREE.MeshStandardMaterial({
         color: '#4a7a3a',
+        normalMap: detailNormal,
+        normalScale: new THREE.Vector2(0.7, 0.7),
         roughness: 0.9,
         metalness: 0,
         emissive: new THREE.Color('#183d14'),

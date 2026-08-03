@@ -3,7 +3,9 @@
 Browser-based 3D Mars colony builder. This document is the complete context
 needed to continue the project in a fresh session.
 
-**Status: M1–M8 complete.** Next up is M9.
+**Status: M1–M8 complete. V2 Pass 1 complete.** Next up is V2 Pass 2 —
+see `KRYONIS_V2_PLAN.md` for the agreed scope and the decisions behind it,
+and `KRYONIS_ASSET_SHOPPING_LIST.md` (+ `.pdf`) for the model/texture brief.
 
 ---
 
@@ -67,6 +69,16 @@ for the first two sols.
 
 **A sol is 24 minutes** (`SOL_DURATION_SECONDS = 1440`).
 
+**Research takes time; the build tree does not.** A research project costs
+points up front and then runs for a while. That elapsed time is the only reason
+the crew screen matters — the assigned lead makes a project both cheaper and
+shorter, and one project runs at a time. Making research instant again would
+silently delete the crew system's purpose.
+
+**Locked never means dimmer.** Every unavailable state says which kind of
+unavailable it is, in words, at full contrast. `opacity-40` on a locked entry
+was the single worst readability bug in V1.
+
 ---
 
 ## 3. Architecture
@@ -128,6 +140,9 @@ canvases from periodic value noise.
 | `Cannot read properties of null (reading 'alpha')` | postprocessing reads `renderer.getContext().getContextAttributes()`. Context was null. | `PostFX` checks the context **every render** (not memoised) and renders nothing rather than crashing. |
 | `matrixWorld of undefined` | Scaling/moving a rigged model **before** cloning breaks the clone's skeleton bindings. | Rig left untouched; transform applied to a wrapper Group. |
 | 64% of the map unbuildable | High-frequency octaves in mountain noise created micro-slopes above the buildable threshold everywhere. | Fewer octaves; slope sampled at tile scale, not half-tile. |
+| Territory button opened nothing | `Dock` had a `territory` key but `page.tsx` had no branch for it, so the section switched and the right rail fell through to the directive panel. A dead button that looked alive. | `TerritoryConsole`. **Lesson: `DockKey` and the section switch must be changed together.** |
+| Buildings floating above the ground | Structures are seated at the *highest* corner of their footprint so nothing is ever buried — which leaves the downhill corners unsupported on any slope. | `FoundationLayer`: one instanced plinth per building, filling from the seat height down to the low corner. Do not "fix" this by lowering the buildings. |
+| Small text unreadable | `--color-faint` and `--color-titanium` were both `#6d665e` — 3.5:1 on the void background, under the 4.5:1 needed for body text — and locked states were expressed as `opacity-40` on top of that. | Both colours lifted above 4.5:1; locked/blocked/owned states now use the `state-*` utilities in `globals.css`, which keep full text contrast and change the *container* instead. |
 
 **Lesson worth keeping:** the dev-server log buffer is cumulative since server
 start. Stale errors in it caused a long chase after an already-fixed bug.
@@ -146,14 +161,38 @@ Restart the server before trusting a "still failing" log.
 - **M7** Research (12 nodes), rolling directives, 6 dynamic events.
 - **M8** New-colony screen with 3 surveyed landing sites, save/load, autosave.
 - **Upgrades** 3 shared tiers (Standard/Enhanced/Optimised) on every structure.
+- **V2 Pass 1** Full-screen consoles, research-as-projects, mission doctrine,
+  4-step new-colony wizard, foundation plinths, save v3, persistent settings,
+  0.5×/1×/3× time, contrast and locked-state pass.
 
-### Not done
+### Not done — this is V2 Pass 2
 
-- **Codex, tutorial, audio** — M8 items that were descoped for save/load.
+- **More structures.** Target ~30: industry (smelter, polymer plant, parts
+  fabricator), logistics (depot, rover garage, cargo pad), habitation (quarters
+  tier 2, canteen, recreation dome), support (radiator field, dust filtration).
+- **Minimap accuracy** — real deposits and a click-to-move camera.
+- **Swap in downloaded GLB models** as they arrive. Wiring point is
+  `buildParts()` in `catalog.ts`; brief is in `KRYONIS_ASSET_SHOPPING_LIST.md`.
 - **Trade/Exchange** — greyed in the dock.
-- Upcoming Events panel and top-right action row from the reference mockup.
-- Terrain generation runs on the main thread (~1–2s stall at load). Moving it to
-  a Web Worker is the obvious next perf win.
+- Terrain generation runs on the main thread (~1–2s stall at load). Now hidden
+  behind the intro video rather than eliminated; a Web Worker is still the real
+  fix and still the biggest perf win available.
+
+### V2 conventions worth knowing
+
+- **`Console` is the shell for any full-screen screen.** It owns the header,
+  the clock, Esc-to-close and the radar backdrop. Use `ConsoleSection` and
+  `Readout` inside it rather than inventing new containers.
+- **While a console is open the HUD is unmounted, not hidden** — a covered HUD
+  still holds focus and still repaints four times a second behind an opaque
+  screen.
+- **`announce()` in `useToastStore`** is how non-React code (the simulation
+  tick) raises a transient message. `Notifications` is derived state for
+  *ongoing* conditions; toasts are for *moments*. They are not interchangeable.
+- **Doctrine is applied in `initialise()`**, not on the new-game screen, so a
+  reset rebuilds the same start from the profile.
+- **`window.kryonisDebug`** (dev builds only) has `sols`, `setTimeOfDay()` and
+  `grant({research: 500})` for reaching a state without playing to it.
 
 ---
 
