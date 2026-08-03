@@ -1,0 +1,216 @@
+# KRYONIS — Project Handoff
+
+Browser-based 3D Mars colony builder. This document is the complete context
+needed to continue the project in a fresh session.
+
+**Status: M1–M8 complete.** Next up is M9.
+
+---
+
+## 1. Running it
+
+```bash
+npm run dev        # http://localhost:3000
+npm run build      # production build
+npx tsc --noEmit   # typecheck
+```
+
+There is also a `/diagnostics` route: a server-rendered page that runs the world
+generator and reports terrain balance per landing site. It exists because
+"is roughly half this map buildable?" is a question about numbers, not about how
+the regolith looks.
+
+**Environment notes**
+- Next.js 16.2 (Turbopack), React 19, three 0.185, R3F 9.7, drei 10.7, Zustand 5.
+- `experimental.useTypeScriptCli: true` is **required** in `next.config.mjs`.
+  TypeScript 7 is the native compiler and no longer exposes the JS API Next
+  called directly; without this flag the dev server throws on startup.
+- Windows dev: Next refuses two dev servers **per project directory**, not per
+  port. If startup fails with "Another next dev server is already running",
+  kill the stale process tree — `autoPort` will not help.
+
+---
+
+## 2. Design decisions worth not re-litigating
+
+These were deliberate and were revisited more than once.
+
+**The world is the hero.** UI lives on screen edges only; nothing is permitted in
+the centre of the viewport. Panels are glass with 1px hairlines, not opaque
+boxes.
+
+**Palette is Mars, UI is not.** The HUD is cold graphite/titanium with a bronze
+(`--color-dust`) accent. Keeping the instruments cool and metallic separates
+"the world" from "the tools you run it with". Gold is reserved for *new /
+unlocked* only. An earlier bright-cyan pass was rejected as too gamer-RGB.
+
+**Plain English, never chemical notation.** "Oxygen", not "O₂". "Water", not
+"H₂O". A player should never pay a beat of translation to read a resource bar.
+
+**The crater is the boundary.** The playable area is an impact basin ringed by a
+~55m wall. The player cannot leave because there is an escarpment in the way —
+a reason, not an invisible wall. The camera is clamped to the same circle, and
+the colonist walkability grid is the terrain's own buildable mask, so colonists
+*physically cannot* leave the valley with no special-case code.
+
+**Progression is a build tree, not a parallel tech tree.** Structures unlock by
+building prerequisites (Lab → Reactor, Mine → Factory → Propellant Plant).
+Research is separate and only makes what you own *work better*. The two answer
+different questions: "what can I build" vs "how well does it run".
+
+**No hard failure.** Life-support collapse kills colonists and tanks morale, but
+the colony always survives and can rebuild.
+
+**Events are modifiers with timers, never instant losses.** A dust storm cuts
+solar to 35% for a few minutes; it does not delete your panels. Nothing fires
+for the first two sols.
+
+**A sol is 24 minutes** (`SOL_DURATION_SECONDS = 1440`).
+
+---
+
+## 3. Architecture
+
+```
+src/
+  app/                  Next routes: page.tsx (the game), diagnostics/
+  game/
+    core/               constants, resources, quality tiers, seeded RNG + noise
+    world/              terrain generation, terrain mesh, sky, sun/moons, boulders, dust
+    render/             Canvas, Scene, camera rig, lighting, post FX, controllers
+    buildings/          catalog (data), procedural models, materials, BuildingsLayer
+    colonists/          agent model, A* pathfinding, ColonistsLayer
+    sim/                simulation.ts — the pure economy step function
+    progress/           research tree, directives, dynamic events
+    state/              Zustand stores
+    save/               save schema, capture/restore, autosave
+    ui/                 all HUD components
+```
+
+### The load-bearing rule: what lives outside React
+
+Anything that changes **every frame** is kept in plain mutable objects, not in a
+store, because routing it through React would re-render the interface 60×/sec:
+
+- `worldClock.sols` — the colony clock
+- `currentSun`, `currentMoons` — updated in place, zero allocations per frame
+- `cameraTarget` — shared Vector3
+- `occupancy` — Int32Array tile→building index
+- `constructionProgress` — Map of in-progress builds
+- `colonists[]` — the agent roster
+
+Stores hold what the **UI** needs. `SimulationController` runs a fixed 0.25s
+timestep and writes the store 4×/sec, so the HUD refreshes at a sane rate while
+the 3D scene runs at full speed.
+
+### Determinism
+
+Everything derives from one integer seed — terrain, deposits, boulder scatter,
+colonist names. A save stores the seed, not a heightmap. `/diagnostics` asserts
+that two generations from one seed match on all 9216 tiles.
+
+### Rendering strategy
+
+Buildings and colonists are **merged per material and instanced**: one draw call
+per (type × material) regardless of how many exist. Every model is generated at
+runtime — **the project ships no binary art assets**; textures are drawn into
+canvases from periodic value noise.
+
+---
+
+## 4. Bugs fixed (and how, so they don't come back)
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Black screen | `SKY_RADIUS` was raised to 4000, equal to the camera far plane, so the sky dome was frustum-clipped. `depthTest:false` does **not** exempt geometry from near/far clipping. | Sky radius 3000, far plane 4000. |
+| Everything orange, no terrain | `GroundHaze` was a cylinder *enclosing the camera*, drawn over terrain at 0.64 alpha with its densest band at screen-bottom — where the ground is. | Removed. Distance haze is the scene fog's job. |
+| `MAX_TEXTURE_IMAGE_UNITS(16)` shader failures | The offscreen **thumbnail renderer** took a second WebGL context. Browsers cap contexts; the game canvas lost that contest. | Thumbnails removed entirely; build cards use SVG icons. |
+| `Cannot read properties of null (reading 'alpha')` | postprocessing reads `renderer.getContext().getContextAttributes()`. Context was null. | `PostFX` checks the context **every render** (not memoised) and renders nothing rather than crashing. |
+| `matrixWorld of undefined` | Scaling/moving a rigged model **before** cloning breaks the clone's skeleton bindings. | Rig left untouched; transform applied to a wrapper Group. |
+| 64% of the map unbuildable | High-frequency octaves in mountain noise created micro-slopes above the buildable threshold everywhere. | Fewer octaves; slope sampled at tile scale, not half-tile. |
+
+**Lesson worth keeping:** the dev-server log buffer is cumulative since server
+start. Stale errors in it caused a long chase after an already-fixed bug.
+Restart the server before trusting a "still failing" log.
+
+---
+
+## 5. Milestones
+
+- **M1** Scaffold, terrain, sky, sun/moons, camera, post FX, quality tiers.
+- **M2** Grid, terrain classification, radial territory unlocking, placement.
+- **M3** 18 procedural structures, materials, construction.
+- **M4** Economy: power grid, production chains, storage caps, population, morale.
+- **M5** Colonists: named individuals, A* pathfinding, jobs, homes, shifts.
+- **M6** HUD: top strip, dock, floating inspector, notifications, minimap, settings.
+- **M7** Research (12 nodes), rolling directives, 6 dynamic events.
+- **M8** New-colony screen with 3 surveyed landing sites, save/load, autosave.
+- **Upgrades** 3 shared tiers (Standard/Enhanced/Optimised) on every structure.
+
+### Not done
+
+- **Codex, tutorial, audio** — M8 items that were descoped for save/load.
+- **Trade/Exchange** — greyed in the dock.
+- Upcoming Events panel and top-right action row from the reference mockup.
+- Terrain generation runs on the main thread (~1–2s stall at load). Moving it to
+  a Web Worker is the obvious next perf win.
+
+---
+
+## 6. Known constraints
+
+- **Fragment sampler budget is 16** on typical ANGLE/D3D11 contexts. Every
+  material must stay well under it. Current worst case: colour map + shared
+  normal + shadow = 3. **Do not add a second WebGL context anywhere.**
+- Colonist models must stay **instanceable**. Rigged/skinned characters were
+  tried and removed: skinning cannot be instanced, which dropped the crew cap
+  from 240 to 14 and pulled in imported materials that broke shader compilation.
+
+---
+
+## 7. Model wishlist (for outsourcing)
+
+**Hard requirements for anything sourced:**
+
+1. **glTF/GLB only.** Not FBX — FBX is 10–20× larger and needs a heavier loader.
+2. **Under 1 MB per model**, ideally under 400 KB. Draco or Meshopt compressed.
+3. **Under ~8k triangles.** These are seen at 40–100px on screen.
+4. **One material, one texture set** per model. Ideally a single 1024² baked
+   albedo with AO already in it. **Maximum two texture maps** — the sampler
+   budget above is real.
+5. **Y-up, real-world scale (metres), origin at the base centre**, facing +Z.
+6. **CC0 / CC-BY** licence. Please record the source URL and author.
+7. Characters: **rigged with a looping walk + idle** or don't bother — a static
+   character is strictly worse than the procedural one already in the game.
+
+**What would actually help, in priority order:**
+
+| # | Model | Footprint | Notes |
+|---|---|---|---|
+| 1 | **Solar array** | 2×2 tiles (4×4 m) | Tracking PV rows on a frame. Highest visual payoff — there will be dozens on screen. |
+| 2 | **Habitat dome** | 3×3 (6×6 m) | Inflatable shell, regolith berm at the base, one airlock. |
+| 3 | **Greenhouse** | 3×2 (6×4 m) | Glazed barrel vault, visible planting inside. |
+| 4 | **Storage tanks** | 2×2 | Cluster of 3–4 vertical insulated tanks. |
+| 5 | **Fission reactor** | 2×2 | Shielded core + large radiator panels. |
+| 6 | **Ice drill rig** | 2×2 | Derrick + condenser drum. |
+| 7 | **Comms dish** | 2×2 | Steerable high-gain dish on a mast. |
+| 8 | **Spaceport pad** | 4×4 (8×8 m) | Blast-hardened apron, beacon masts, fuel gantry. |
+| 9 | **Rover** | — | Small pressurised rover for scenery/animation. |
+| 10 | **Astronaut** | 1.85 m tall | **Only if rigged** with walk + idle loops. |
+
+Style reference: NASA/SpaceX plausible hardware — white thermal paint, machined
+aluminium, gold MLI foil, dark PV glass. Not military sci-fi, no glowing neon.
+
+Drop models in `public/models/` and wire them into
+`src/game/buildings/catalog.ts` (each entry has a `buildParts()` that can be
+swapped for a GLB loader).
+
+---
+
+## 8. Suggested M9 scope
+
+1. Finish M8's tail: **codex, tutorial, audio** (Web Audio, procedural — no files).
+2. **Terrain generation → Web Worker** to kill the load stall.
+3. **Trade/Exchange** screen (Earth contracts, import/export).
+4. Swap in outsourced GLB models as they arrive.
+5. Colonist detail: click-to-inspect a named colonist, profession icons.

@@ -1,0 +1,305 @@
+@import 'tailwindcss';
+
+/*
+ * KRYONIS design language.
+ *
+ * One rule governs everything here: the world is the hero. The interface is a
+ * set of instruments resting on top of Mars, not a page that Mars happens to be
+ * embedded in. That means glass rather than panels, hairlines rather than
+ * borders, icons rather than labels, and a great deal of empty space.
+ *
+ * The palette is taken from the planet and from the hardware sent there -
+ * graphite, titanium, bronze, dust - and is deliberately desaturated. Nothing
+ * glows. The only genuinely bright colour in the system is reserved for a
+ * life-support failure, so that when the player does see saturation, it means
+ * something.
+ */
+
+@theme {
+  /* --- Substrate: warm blacks, never neutral grey ------------------------ */
+  --color-void: #0c0a09;
+  --color-graphite: #16130f;
+  --color-charcoal: #201b16;
+  --color-slate: #2b2520;
+
+  /* --- Metals ----------------------------------------------------------- */
+  --color-titanium: #6d665e;
+  --color-steel: #918980;
+  --color-bronze: #a8763f;
+  --color-copper: #c2854e;
+
+  /* --- The planet ------------------------------------------------------- */
+  --color-dust: #c98a52;
+  --color-amber: #d6a765;
+  --color-rust: #8a4a2c;
+
+  /* --- Signal: used sparingly, and never decoratively -------------------- */
+  --color-signal: #7fb3bd;
+  --color-good: #7f9c68;
+  --color-warn: #c9a05a;
+  --color-alert: #c65a41;
+
+  /* --- Ink -------------------------------------------------------------- */
+  --color-bone: #ece6dd;
+  --color-ash: #a49c92;
+  --color-faint: #6d665e;
+
+  /* --- Type ------------------------------------------------------------- */
+  --font-display: 'Bahnschrift Condensed', 'Bahnschrift', 'Segoe UI Variable Display',
+    'Roboto Condensed', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* --- Motion ----------------------------------------------------------- */
+  --ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--color-void);
+  color: var(--color-bone);
+  font-family: var(--font-display);
+  font-synthesis-weight: none;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ---------------------------------------------------------------------------
+ * Surfaces
+ *
+ * Glass, not panels. A single hairline at 8% white reads as an edge catching
+ * light rather than as a drawn border, which is the whole difference between an
+ * instrument and a div.
+ * ------------------------------------------------------------------------- */
+
+@utility glass {
+  background: color-mix(in oklab, var(--color-graphite) 82%, transparent);
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  border: 1px solid rgb(255 255 255 / 0.07);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 16px 44px -20px rgb(0 0 0 / 0.9);
+}
+
+/* Deeper glass for surfaces that sit over the build deck. */
+@utility glass-deep {
+  background: color-mix(in oklab, var(--color-void) 88%, transparent);
+  backdrop-filter: blur(26px) saturate(1.05);
+  -webkit-backdrop-filter: blur(26px) saturate(1.05);
+  border: 1px solid rgb(255 255 255 / 0.06);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 24px 60px -28px rgb(0 0 0 / 0.95);
+}
+
+/* A hairline divider that fades at both ends, so it never looks stuck on. */
+@utility rule-x {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgb(255 255 255 / 0.1) 18%,
+    rgb(255 255 255 / 0.1) 82%,
+    transparent
+  );
+}
+
+@utility rule-y {
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(255 255 255 / 0.09) 22%,
+    rgb(255 255 255 / 0.09) 78%,
+    transparent
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Type scale
+ *
+ * Four sizes, and hierarchy carried by weight-restraint and letter-spacing
+ * rather than by bolding everything. Condensed faces read as engineered.
+ * ------------------------------------------------------------------------- */
+
+@utility t-lg {
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+@utility t-md {
+  font-size: 0.95rem;
+  line-height: 1.15;
+  font-weight: 500;
+}
+
+@utility t-sm {
+  font-size: 0.78rem;
+  line-height: 1.25;
+  font-weight: 400;
+}
+
+/* Micro-labels. Tracked out wide so they read as instrument legends. */
+@utility t-micro {
+  font-size: 0.58rem;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-faint);
+}
+
+/* Numeric readouts, always tabular so digits do not jitter as they change. */
+@utility t-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Motion
+ *
+ * Nothing appears instantly. Panels rise and settle; the spring easing is what
+ * separates "a game" from "a web page".
+ * ------------------------------------------------------------------------- */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.anim-rise {
+  animation: rise-in 340ms var(--ease-spring) both;
+}
+.anim-slide-left {
+  animation: slide-in-left 260ms var(--ease-out-soft) both;
+}
+.anim-fade {
+  animation: fade-in 240ms ease both;
+}
+.anim-breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* Interactive surfaces respond, but subtly - a lift of two pixels, not a bounce. */
+@utility press {
+  transition:
+    transform 220ms var(--ease-spring),
+    background-color 220ms ease,
+    border-color 220ms ease,
+    opacity 220ms ease;
+}
+.press:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.press:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+
+/* ---------------------------------------------------------------------------
+ * Scrollers
+ * ------------------------------------------------------------------------- */
+
+.quiet-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.12) transparent;
+}
+.quiet-scroll::-webkit-scrollbar {
+  height: 4px;
+  width: 4px;
+}
+.quiet-scroll::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.12);
+  border-radius: 2px;
+}
+.quiet-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Edge fades on horizontal scrollers, so content dissolves rather than clips. */
+@utility fade-edges-x {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    black 3.5rem,
+    black calc(100% - 3.5rem),
+    transparent
+  );
+}
+
+/*
+ * HUD scaling
+ *
+ * Some viewports (especially 1366×768-class laptops) can end up needing the
+ * user to browser-zoom out to see all HUD elements. Instead of asking for zoom,
+ * scale the HUD slightly based on the viewport so it fits at 100% browser zoom.
+ */
+@utility hud-scale {
+  --hud-scale: clamp(0.8, min(calc(100vw / 1200), calc(100dvh / 900)), 1);
+  width: calc(100% / var(--hud-scale));
+  height: calc(100% / var(--hud-scale));
+  transform: scale(var(--hud-scale));
+  transform-origin: top left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
