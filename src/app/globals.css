@@ -23,8 +23,15 @@
   --color-slate: #2b2520;
 
   /* --- Metals ----------------------------------------------------------- */
-  --color-titanium: #6d665e;
-  --color-steel: #918980;
+  /*
+   * Titanium and faint were both #6d665e, which measures 3.5:1 against the
+   * void background - under the 4.5:1 needed for body text, and these carry
+   * most of the small type in the game. Both were lifted until they pass:
+   * titanium 4.8:1, faint 5.2:1. The hierarchy between them is unchanged,
+   * it is just no longer built out of illegibility.
+   */
+  --color-titanium: #837c72;
+  --color-steel: #a09788;
   --color-bronze: #a8763f;
   --color-copper: #c2854e;
 
@@ -41,8 +48,8 @@
 
   /* --- Ink -------------------------------------------------------------- */
   --color-bone: #ece6dd;
-  --color-ash: #a49c92;
-  --color-faint: #6d665e;
+  --color-ash: #b3aba0;
+  --color-faint: #8a8279;
 
   /* --- Type ------------------------------------------------------------- */
   --font-display: 'Bahnschrift Condensed', 'Bahnschrift', 'Segoe UI Variable Display',
@@ -128,6 +135,58 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+ * States
+ *
+ * Locked, undiscovered and unaffordable used to be expressed by turning the
+ * opacity down, which made them unreadable and - worse - indistinguishable from
+ * each other. A player could not tell "you cannot afford this" from "this does
+ * not exist yet". Each now has a shape of its own and keeps full text contrast:
+ * the content stays readable, the container says why you cannot have it.
+ * ------------------------------------------------------------------------- */
+
+/* Not yet unlocked. A dashed edge reads as "outline of a thing that isn't here". */
+@utility state-locked {
+  border: 1px dashed rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.012);
+}
+
+/* Unlocked and affordable. A solid edge and a touch of lift. */
+@utility state-open {
+  border: 1px solid rgb(255 255 255 / 0.09);
+  background: rgb(255 255 255 / 0.035);
+}
+
+/* Owned or completed. Bronze edge - the only place the accent means "yours". */
+@utility state-owned {
+  border: 1px solid color-mix(in oklab, var(--color-dust) 42%, transparent);
+  background: color-mix(in oklab, var(--color-dust) 9%, transparent);
+}
+
+/* Real but unaffordable: hatched, so it reads as "blocked" not "absent". */
+@utility state-blocked {
+  border: 1px solid rgb(255 255 255 / 0.07);
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgb(255 255 255 / 0.028) 0 6px,
+      transparent 6px 12px
+    );
+}
+
+/* A small caps label attached to a state, e.g. UNDISCOVERED / LOCKED. */
+@utility tag {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 0.16rem 0.4rem;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  line-height: 1.1;
+}
+
+/* ---------------------------------------------------------------------------
  * Type scale
  *
  * Four sizes, and hierarchy carried by weight-restraint and letter-spacing
@@ -208,6 +267,17 @@ body {
   }
   to {
     opacity: 1;
+  }
+}
+
+/* The console radar. One rotation every seven seconds - slow enough to read as
+   an instrument idling rather than as a loading spinner. */
+@keyframes radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 

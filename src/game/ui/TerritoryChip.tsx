@@ -11,15 +11,18 @@ import { useColonyStore } from '../state/useColonyStore';
  * Two controls that used to occupy a full toolbar, reduced to one chip. The
  * claim is a ring rather than a percentage bar because it describes a circular
  * crater - the shape of the readout matches the shape of the thing.
+ *
+ * The chip no longer *performs* the expansion; it reports the claim and opens
+ * the territory console. Buying land off a two-line chip meant committing
+ * thousands of credits with no idea what was in the band being bought.
  */
-export function TerritoryChip() {
+export function TerritoryChip({ onOpen }: { onOpen: () => void }) {
   const tool = useBuildStore((state) => state.tool);
   const setTool = useBuildStore((state) => state.setTool);
   const cancel = useBuildStore((state) => state.cancel);
 
   const unlockedRadius = useColonyStore((state) => state.unlockedRadius);
   const money = useColonyStore((state) => state.stock.money);
-  const expandTerritory = useColonyStore((state) => state.expandTerritory);
   const nextExpansionCost = useColonyStore((state) => state.nextExpansionCost);
 
   const atMaximum = unlockedRadius >= VALLEY_FLOOR_RADIUS;
@@ -51,22 +54,17 @@ export function TerritoryChip() {
 
       <button
         type="button"
-        disabled={atMaximum || !affordable}
-        onClick={expandTerritory}
+        onClick={onOpen}
         title={
           atMaximum
-            ? 'The whole crater floor is claimed'
-            : `Extend the perimeter for ${formatAmount(cost)} credits`
+            ? 'The whole crater floor is claimed - open the survey'
+            : `Survey and claim the next band, ${formatAmount(cost)} credits`
         }
-        className={`press flex flex-col items-start rounded-[2px] px-1 py-0.5 transition-colors ${
-          atMaximum || !affordable
-            ? 'cursor-not-allowed text-faint'
-            : 'text-ash hover:text-bone'
-        }`}
+        className="press flex flex-col items-start rounded-[2px] px-1 py-0.5 text-ash transition-colors hover:text-bone"
       >
         <span className="t-micro">Perimeter</span>
         <span className={`t-num mt-1 text-[0.72rem] ${affordable && !atMaximum ? 'text-dust' : ''}`}>
-          {atMaximum ? 'Complete' : `Extend · ${formatAmount(cost)}`}
+          {atMaximum ? 'Complete' : `Survey · ${formatAmount(cost)}`}
         </span>
       </button>
 

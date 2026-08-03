@@ -6,6 +6,7 @@ import { useFrame } from '@react-three/fiber';
 import { BUILDINGS } from '../buildings/catalog';
 import { useColonyStore } from '../state/useColonyStore';
 import { useProgressStore } from '../state/useProgressStore';
+import { useSettingsStore } from '../state/useSettingsStore';
 import { currentSun } from '../world/sun';
 import { audio } from './audio';
 
@@ -20,6 +21,13 @@ import { audio } from './audio';
 export function AudioController() {
   const previous = useRef({ completed: 0, criticalAlerts: 0, research: 0 });
   const throttle = useRef(0);
+  const audioEnabled = useSettingsStore((state) => state.audioEnabled);
+
+  // The setting is persisted, so this also applies the stored preference on
+  // load rather than starting every session unmuted.
+  useEffect(() => {
+    audio.setMuted(!audioEnabled);
+  }, [audioEnabled]);
 
   // Unlock on the first real gesture anywhere in the document.
   useEffect(() => {

@@ -25,6 +25,8 @@ import {
   upgradeCost,
   type BuildingId,
 } from '../buildings/catalog';
+import { currentDoctrine } from './useProfileStore';
+import { useProgressStore } from './useProgressStore';
 import {
   DepositKind,
   TerrainKind,
@@ -132,10 +134,46 @@ export function buildingTransform(
 }
 
 /**
+ * The pad a structure stands on.
+ *
+ * Seating every building at the *highest* corner of its footprint guarantees no
+ * part of it is buried, but on any sloped tile it leaves the downhill corners
+ * hanging in the air - which is what "everything is floating" was. The building
+ * itself still sits at the high point; this describes the plinth that fills the
+ * gap underneath it, which is exactly what a real prepared pad on sloped ground
+ * would be.
+ *
+ * `drop` is the relief across the footprint plus a small embed, so the plinth
+ * always bites into the ground rather than resting exactly on the lowest tile
+ * and leaving a visible hairline.
+ */
+export function buildingFooting(
+  terrain: TerrainData,
+  building: Pick<PlacedBuilding, 'type' | 'tx' | 'tz' | 'rotation'>,
+): { x: number; z: number; top: number; drop: number; width: number; depth: number } {
+  const [w, d] = rotatedFootprint(building.type, building.rotation);
+  const { high, low } = footprintGroundHeight(terrain, building.tx, building.tz, w, d);
+  return {
+    x: (building.tx + w / 2) * TILE_SIZE - WORLD_HALF,
+    z: (building.tz + d / 2) * TILE_SIZE - WORLD_HALF,
+    top: high,
+    drop: high - low + FOOTING_EMBED,
+    // Slightly inset from the footprint so neighbouring pads read as separate
+    // slabs rather than merging into one continuous floor.
+    width: w * TILE_SIZE - 0.18,
+    depth: d * TILE_SIZE - 0.18,
+  };
+}
+
+/** How far a foundation pad sinks below the lowest tile it covers, in metres. */
+const FOOTING_EMBED = 0.35;
+
+/**
  * Highest and lowest terrain under a footprint.
  *
- * Structures are seated at the high point so nothing ever floats; the spread
- * between the two is what `maxRelief` tests against.
+ * Structures are seated at the high point so nothing is ever buried; the spread
+ * between the two is what `maxRelief` tests against, and what the foundation
+ * plinth fills.
  */
 function footprintGroundHeight(
   terrain: TerrainData,
@@ -323,9 +361,23 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
     const buildings = [lander];
     reindexOccupancy(buildings);
 
+    // Doctrine is applied here rather than at the opening screen, so that a
+    // reset or a reload rebuilds the same starting position from the profile
+    // instead of relying on whatever the new-game screen happened to do once.
+    const doctrine = currentDoctrine();
+    const stock = startingStock();
+    for (const [id, amount] of Object.entries(doctrine.startingStock)) {
+      const key = id as keyof typeof stock;
+      if (typeof stock[key] === 'number') stock[key] = Math.max(0, stock[key] + (amount ?? 0));
+    }
+
+    if (doctrine.freeResearch) {
+      useProgressStore.getState().unlockResearch(doctrine.freeResearch);
+    }
+
     set({
       buildings,
-      stock: startingStock(),
+      stock,
       unlockedRadius: START_UNLOCK_RADIUS,
       selectedId: null,
       population: 4,

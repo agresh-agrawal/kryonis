@@ -25,6 +25,7 @@ import {
   type ResearchId,
 } from '../progress/research';
 import type { ResourceBundle, ResourceStock } from '../core/resources';
+import { announce } from './useToastStore';
 
 export interface CompletedDirective {
   id: string;
@@ -34,10 +35,35 @@ export interface CompletedDirective {
   sol: number;
 }
 
+/**
+ * A research project currently running.
+ *
+ * Research used to be an instant purchase, which made the assigned researcher
+ * meaningless - there was no elapsed time for them to be faster at. A project
+ * now costs points up front and then *takes a while*, and the crew member
+ * leading it moves both numbers. That is the whole reason the crew screen and
+ * the research screen need each other.
+ */
+export interface ResearchProject {
+  id: ResearchId;
+  /** Game seconds elapsed. */
+  elapsed: number;
+  /** Game seconds required, already scaled by the lead researcher. */
+  duration: number;
+}
+
+/** Baseline project length in game seconds, before the researcher is applied. */
+export function baseProjectDuration(id: ResearchId): number {
+  return 150 + RESEARCH[id].cost * 3.5;
+}
+
 interface ProgressState {
   unlocked: Set<ResearchId>;
   /** Cached aggregate so the simulation does not recompute it every tick. */
   effects: ResearchEffects;
+
+  /** The one project in flight, or null. One at a time, so staffing matters. */
+  project: ResearchProject | null;
 
   /** Index into MISSIONS; beyond its length, directives are generated. */
   missionIndex: number;
@@ -53,8 +79,13 @@ interface ProgressState {
   lastEvent: { id: string; at: number } | null;
 
   unlockResearch: (id: ResearchId) => boolean;
+  /** Begins a project. Fails if one is already running or the node is locked. */
+  startProject: (id: ResearchId, duration: number) => boolean;
+  /** Abandons the running project. The points already spent are not refunded. */
+  cancelProject: () => void;
   /** Advances directives and events. Returns rewards to pay out. */
   tick: (dt: number, sols: number, ctx: MissionContext) => ResourceBundle[];
+  restore: (snapshot: { unlocked: ResearchId[]; project?: ResearchProject | null }) => void;
   reset: () => void;
 }
 
@@ -65,6 +96,7 @@ function initialMissions(): Mission[] {
 export const useProgressStore = create<ProgressState>((set, get) => ({
   unlocked: new Set<ResearchId>(),
   effects: aggregateEffects(new Set()),
+  project: null,
 
   missionIndex: 2,
   active: initialMissions(),
@@ -85,9 +117,40 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     return true;
   },
 
+  startProject: (id, duration) => {
+    const state = get();
+    if (state.project) return false;
+    if (!isAvailable(id, state.unlocked)) return false;
+    set({ project: { id, elapsed: 0, duration: Math.max(1, duration) } });
+    return true;
+  },
+
+  cancelProject: () => set({ project: null }),
+
   tick: (dt, sols, ctx) => {
     const state = get();
     const rewards: ResourceBundle[] = [];
+
+    // --- Research in flight ---------------------------------------------
+    // Advanced before directives, so a directive that asks for a completed
+    // research node sees it on the same tick it finishes.
+    let project = state.project;
+    let unlocked = state.unlocked;
+    let effects = state.effects;
+    let projectFinished: ResearchId | null = null;
+
+    if (project) {
+      const elapsed = project.elapsed + dt;
+      if (elapsed >= project.duration) {
+        unlocked = new Set(unlocked);
+        unlocked.add(project.id);
+        effects = aggregateEffects(unlocked);
+        projectFinished = project.id;
+        project = null;
+      } else {
+        project = { ...project, elapsed };
+      }
+    }
 
     // --- Directives -----------------------------------------------------
     let { missionIndex } = state;
@@ -139,10 +202,14 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     const changed =
       finished.length > 0 ||
       events.length !== state.events.length ||
-      lastEvent !== state.lastEvent;
+      lastEvent !== state.lastEvent ||
+      projectFinished !== null;
 
     if (changed) {
       set({
+        unlocked,
+        effects,
+        project,
         missionIndex,
         active,
         completed,
@@ -154,16 +221,32 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     } else {
       // Timers still advance even when nothing structural changed, but we
       // avoid replacing the arrays so subscribers do not re-render.
-      set({ eventCooldown, events });
+      set({ eventCooldown, events, project });
+    }
+
+    if (projectFinished) {
+      announce('Research complete', RESEARCH[projectFinished].name, 'good');
     }
 
     return rewards;
+  },
+
+  restore: (snapshot) => {
+    const unlocked = new Set<ResearchId>(
+      snapshot.unlocked.filter((id): id is ResearchId => id in RESEARCH),
+    );
+    set({
+      unlocked,
+      effects: aggregateEffects(unlocked),
+      project: snapshot.project ?? null,
+    });
   },
 
   reset: () =>
     set({
       unlocked: new Set<ResearchId>(),
       effects: aggregateEffects(new Set()),
+      project: null,
       missionIndex: 2,
       active: initialMissions(),
       completed: [],

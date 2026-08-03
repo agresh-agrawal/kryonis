@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { QualitySettings } from '../core/quality';
+import { currentDoctrine } from '../state/useProfileStore';
 import { useTimeStore } from '../state/useTimeStore';
 import {
   buildingTransform,
@@ -15,6 +16,7 @@ import {
 import type { TerrainData } from '../world/terrain';
 import { currentSun } from '../world/sun';
 import { BUILDINGS, getBuildingModel, upgradeTier, type BuildingId } from './catalog';
+import { FoundationLayer } from './FoundationLayer';
 import { MaterialLibrary, type MaterialKey } from './materials';
 
 /** Tint applied to structures still under construction. */
@@ -74,10 +76,11 @@ export function BuildingsLayer({
 
       // A structure at level 1 is being built; anything higher is being
       // retrofitted, and a retrofit is quicker than the original build.
+      // An industrial programme pours concrete faster than a research one.
       const duration =
-        building.level > 1
+        (building.level > 1
           ? upgradeTier(building.level).buildTime
-          : BUILDINGS[building.type].buildTime;
+          : BUILDINGS[building.type].buildTime) * currentDoctrine().buildTimeScale;
 
       const current = constructionProgress.get(building.id) ?? 0;
       const next = current + (delta * speed) / Math.max(0.001, duration);
@@ -91,6 +94,9 @@ export function BuildingsLayer({
 
   return (
     <group name="colony">
+      {/* Pads first: they are what the structures above are standing on. */}
+      <FoundationLayer terrain={terrain} quality={quality} materials={materials} />
+
       {byType.map(([type, list]) => (
         <BuildingTypeInstances
           key={type}

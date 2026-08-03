@@ -7,8 +7,8 @@ import { AutoSave } from '@/game/save/AutoSave';
 import { clearSave } from '@/game/save/saveGame';
 import { BootVideo } from '@/game/ui/BootVideo';
 import { BuildDeck } from '@/game/ui/BuildDeck';
-import { CodexPanel } from '@/game/ui/CodexPanel';
-import { CrewPanel } from '@/game/ui/CrewPanel';
+import { CodexConsole } from '@/game/ui/CodexConsole';
+import { CrewConsole } from '@/game/ui/CrewConsole';
 import { DirectivePanel } from '@/game/ui/DirectivePanel';
 import { Dock, type DockKey } from '@/game/ui/Dock';
 import { FloatingInspector } from '@/game/ui/FloatingInspector';
@@ -16,16 +16,20 @@ import { Minimap } from '@/game/ui/Minimap';
 import { NewColony } from '@/game/ui/NewColony';
 import { Notifications } from '@/game/ui/Notifications';
 import { PlacementHint } from '@/game/ui/PlacementHint';
-import { ResearchPanel } from '@/game/ui/ResearchPanel';
+import { ResearchConsole } from '@/game/ui/ResearchConsole';
 import { SettingsMenu } from '@/game/ui/SettingsMenu';
 import { TerritoryChip } from '@/game/ui/TerritoryChip';
+import { TerritoryConsole } from '@/game/ui/TerritoryConsole';
 import { TimePill } from '@/game/ui/TimePill';
+import { Toasts } from '@/game/ui/Toasts';
 import { TopBar } from '@/game/ui/TopBar';
 import { useBuildStore } from '@/game/state/useBuildStore';
 import { useColonyStore } from '@/game/state/useColonyStore';
 import { useCrewStore } from '@/game/state/useCrewStore';
+import { useProfileStore } from '@/game/state/useProfileStore';
 import { useProgressStore } from '@/game/state/useProgressStore';
 import { useTimeStore } from '@/game/state/useTimeStore';
+import { useToastStore } from '@/game/state/useToastStore';
 import { useWorldStore } from '@/game/state/useWorldStore';
 
 /**
@@ -63,6 +67,7 @@ function LoadingScreen() {
 
 export default function Page() {
   const siteName = useWorldStore((state) => state.siteName);
+  const corporation = useProfileStore((state) => state.corporation);
   const [section, setSection] = useState<DockKey>('overview');
   const [booted, setBooted] = useState(false);
 
@@ -77,6 +82,22 @@ export default function Page() {
   // it returns the whole lower third of the screen to Mars.
   const deckOpen = section === 'build';
 
+  /*
+   * Four sections take the whole screen instead of a rail.
+   *
+   * Crew, research, territory and the codex are all decisions made sitting
+   * still, and squeezing them into a 17rem column beside a live 3D scene was
+   * what made the text unreadable and the panels collide. While one is open the
+   * HUD is not rendered at all - not merely covered - so nothing underneath can
+   * steal a click or a keystroke.
+   */
+  const consoleSection =
+    section === 'crew' || section === 'research' || section === 'territory' || section === 'codex'
+      ? section
+      : null;
+
+  const closeConsole = () => setSection('overview');
+
   useEffect(() => {
     if (tool === 'select' && deckOpen) setSection('overview');
   }, [tool, deckOpen]);
@@ -86,6 +107,14 @@ export default function Page() {
     cancel();
   };
 
+  /**
+   * Returns to the opening screen with nothing carried over.
+   *
+   * Every store that holds colony state is reset explicitly rather than by
+   * reloading the page: a reload would replay the whole boot sequence and
+   * re-download the intro video, and it would lose the reason the player is
+   * here - they want a new colony, not a restarted browser tab.
+   */
   const resetWorld = () => {
     clearSave();
     cancel();
@@ -93,6 +122,8 @@ export default function Page() {
     useProgressStore.getState().reset();
     useCrewStore.getState().reset();
     useTimeStore.getState().reset();
+    useProfileStore.getState().reset();
+    useToastStore.getState().clear();
     useColonyStore.setState({
       buildings: [],
       selectedId: null,
@@ -103,23 +134,46 @@ export default function Page() {
 
   return (
     <main className="relative h-dvh w-screen overflow-hidden bg-void">
-      {booted ? <GameCanvas /> : null}
+      {/*
+        The world mounts immediately, underneath the intro video rather than
+        after it. Terrain generation is a one-to-two second main-thread stall and
+        shader compilation is another; running both while the video plays means
+        the player pays for them once instead of twice, and "Skip" lands on a
+        colony that is already there.
+      */}
+      <GameCanvas />
       {booted ? null : <BootVideo onComplete={() => setBooted(true)} />}
       {started ? <AutoSave /> : null}
       {booted && !started ? <NewColony onBegin={() => setStarted(true)} /> : null}
+
+      {/* Full-screen consoles. Rendered above the HUD and replacing it. */}
+      {started && consoleSection === 'crew' ? <CrewConsole onClose={closeConsole} /> : null}
+      {started && consoleSection === 'research' ? <ResearchConsole onClose={closeConsole} /> : null}
+      {started && consoleSection === 'territory' ? (
+        <TerritoryConsole onClose={closeConsole} />
+      ) : null}
+      {started && consoleSection === 'codex' ? <CodexConsole onClose={closeConsole} /> : null}
+
+      <Toasts />
 
       {/*
         The interface lives entirely on the edges. Nothing is permitted in the
         centre of the viewport: that space belongs to the colony, and every
         element below is positioned against a screen edge rather than flowing in
         a document.
+
+        Unmounted rather than hidden while a console is open. A HUD that is
+        merely covered still holds focus, still answers keyboard shortcuts, and
+        still repaints a dozen readouts four times a second behind an opaque
+        screen the player cannot see through.
       */}
+      {consoleSection !== null || !started ? null : (
       <div className="pointer-events-none absolute inset-0 z-10 hud-scale">
         {/* --- Top: identity, then the instrument strip --- */}
         <div className="absolute inset-x-0 top-0 flex flex-nowrap items-start justify-between gap-2 p-2 min-[640px]:p-3">
           <div className="glass anim-fade pointer-events-auto hidden flex-col rounded-[3px] px-3 py-2 min-[1180px]:flex">
-            <span className="text-[1.05rem] leading-none font-light tracking-[0.34em] text-bone">
-              KRYONIS
+            <span className="t-md max-w-[13rem] truncate leading-none text-bone">
+              {corporation}
             </span>
             <span className="t-micro mt-1.5">{siteName}</span>
           </div>
@@ -156,23 +210,10 @@ export default function Page() {
           height-capped so it can never reach the build deck either.
         */}
         <div
-          className={`quiet-scroll absolute right-3 top-28 flex max-h-[calc(100dvh-10rem)] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-0.5 transition-[width] duration-300 min-[1180px]:right-4 min-[1180px]:top-36 min-[1180px]:max-h-[calc(100dvh-18rem)] ${
-            section === 'research' || section === 'codex' || section === 'crew'
-              ? 'w-[min(23rem,calc(100vw-5rem))]'
-              : 'w-[min(17.5rem,calc(100vw-5rem))]'
-          }`}
-          style={{ transitionTimingFunction: 'var(--ease-spring)' }}
+          className="quiet-scroll absolute right-3 top-28 flex max-h-[calc(100dvh-10rem)] w-[min(17.5rem,calc(100vw-5rem))] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-0.5 min-[1180px]:right-4 min-[1180px]:top-36 min-[1180px]:max-h-[calc(100dvh-18rem)]"
         >
-          <TerritoryChip />
-          {section === 'crew' ? (
-            <CrewPanel onClose={() => setSection('overview')} />
-          ) : section === 'research' ? (
-            <ResearchPanel onClose={() => setSection('overview')} />
-          ) : section === 'codex' ? (
-            <CodexPanel onClose={() => setSection('overview')} />
-          ) : (
-            <DirectivePanel />
-          )}
+          <TerritoryChip onOpen={() => setSection('territory')} />
+          <DirectivePanel />
           <FloatingInspector />
         </div>
 
@@ -185,6 +226,7 @@ export default function Page() {
           {deckOpen ? <BuildDeck onDismiss={closeDeck} /> : null}
         </div>
       </div>
+      )}
     </main>
   );
 }

@@ -134,3 +134,33 @@ export function researchDiscount(member: CrewMember | undefined, branch: Researc
   const base = affinity === branch || affinity === 'Any' ? 0.12 : 0.05;
   return Math.min(0.35, base + member.rank * 0.04);
 }
+
+/**
+ * How fast a project runs, as a multiplier on the baseline.
+ *
+ * The assigned lead affects research twice - `researchDiscount` makes a project
+ * cheaper, this makes it finish sooner. Two separate levers rather than one
+ * bigger discount, because they answer different player questions: "can I
+ * afford this yet" and "will it land before I need it".
+ *
+ * Unled research still progresses. A colony that has not thought about staffing
+ * should be slow, not stopped - a hard block would just be a hidden
+ * prerequisite the player was never told about.
+ */
+export function researchSpeed(member: CrewMember | undefined, branch: ResearchBranch): number {
+  if (!member) return 0.55;
+  const affinity = SKILL_RESEARCH_BRANCH[member.skill];
+  const matched = affinity === branch || affinity === 'Any';
+  return (matched ? 1.15 : 0.85) + member.rank * (matched ? 0.18 : 0.09);
+}
+
+/** Plain-English summary of what a member brings to a branch, for the console. */
+export function describeAffinity(
+  member: CrewMember,
+  branch: ResearchBranch,
+): { matched: boolean; text: string } {
+  const affinity = SKILL_RESEARCH_BRANCH[member.skill];
+  if (affinity === 'Any') return { matched: true, text: `Adapts to any branch` };
+  if (affinity === branch) return { matched: true, text: `Specialist in ${branch}` };
+  return { matched: false, text: `Trained in ${affinity}, not ${branch}` };
+}

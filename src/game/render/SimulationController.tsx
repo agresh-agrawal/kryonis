@@ -8,6 +8,7 @@ import type { ResourceId } from '../core/resources';
 import type { MissionContext } from '../progress/missions';
 import { useColonyStore } from '../state/useColonyStore';
 import { useCrewStore } from '../state/useCrewStore';
+import { currentDoctrine } from '../state/useProfileStore';
 import { useProgressStore } from '../state/useProgressStore';
 import { useTimeStore, worldClock } from '../state/useTimeStore';
 import { currentSun } from '../world/sun';
@@ -57,6 +58,7 @@ export function SimulationController() {
       powerDraw: research.powerDraw * event.powerDraw,
       storage: research.storage,
       morale: research.morale + event.morale,
+      lifeSupportDraw: currentDoctrine().lifeSupportScale,
     };
 
     let ticks = 0;

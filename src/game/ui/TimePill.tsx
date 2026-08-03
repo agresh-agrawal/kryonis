@@ -1,10 +1,21 @@
 'use client';
 
-import { dayFraction, solNumber, useTimeStore, type GameSpeed } from '../state/useTimeStore';
+import {
+  GAME_SPEEDS,
+  SPEED_LABEL,
+  dayFraction,
+  solNumber,
+  useTimeStore,
+} from '../state/useTimeStore';
 import { formatSolTime } from '../world/sun';
 import { useTicker } from './useTicker';
 
-const SPEEDS: GameSpeed[] = [1, 2, 4];
+/** What each tempo is for, in the tooltip. */
+const SPEED_HINT: Record<number, string> = {
+  0.5: 'Half speed - watch the detail',
+  1: 'Normal speed',
+  3: 'Fast forward',
+};
 
 /**
  * Time.
@@ -55,20 +66,22 @@ export function TimePill() {
           onClick={togglePause}
           path={paused ? 'M3 2l8 5-8 5z' : 'M3 2h2.6v10H3zM8.4 2H11v10H8.4z'}
         />
-        {SPEEDS.map((value, index) => (
+        {GAME_SPEEDS.map((value, index) => (
           <button
             key={value}
             type="button"
             onClick={() => setSpeed(value)}
             aria-pressed={!paused && speed === value}
-            title={`${value}× speed (${index + 1})`}
-            className={`press t-num h-7 w-7 rounded-[2px] text-[0.66rem] transition-colors min-[1180px]:h-8 min-[1180px]:w-8 min-[1180px]:text-[0.7rem] ${
+            aria-label={`${value}x speed`}
+            title={`${SPEED_HINT[value]} (${index + 1})`}
+            className={`press h-7 w-7 rounded-[2px] text-[0.72rem] transition-colors min-[1180px]:h-8 min-[1180px]:w-8 min-[1180px]:text-[0.78rem] ${
               !paused && speed === value
                 ? 'bg-white/10 text-dust'
                 : 'text-titanium hover:bg-white/5 hover:text-bone'
             }`}
           >
-            {value}
+            {SPEED_LABEL[value]}
+            <span className="text-[0.62em] opacity-70">×</span>
           </button>
         ))}
       </div>

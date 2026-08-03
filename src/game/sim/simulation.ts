@@ -81,6 +81,11 @@ export interface SimModifiers {
   powerDraw: number;
   storage: number;
   morale: number;
+  /**
+   * Multiplies what the crew consume, as opposed to what the colony produces.
+   * Below 1 is a saving. Set from mission doctrine, not from research.
+   */
+  lifeSupportDraw: number;
 }
 
 export const NO_MODIFIERS: SimModifiers = {
@@ -92,6 +97,7 @@ export const NO_MODIFIERS: SimModifiers = {
   powerDraw: 1,
   storage: 1,
   morale: 0,
+  lifeSupportDraw: 1,
 };
 
 /** Which modifier applies to a given produced resource. */
@@ -305,7 +311,7 @@ export function stepColony(
 
   // ---- Life support -----------------------------------------------------
   const consume = (resource: 'oxygen' | 'water' | 'food') => {
-    const needed = LIFE_SUPPORT[resource] * population * dt;
+    const needed = LIFE_SUPPORT[resource] * population * mods.lifeSupportDraw * dt;
     if (stock[resource] >= needed) {
       stock[resource] -= needed;
       return true;

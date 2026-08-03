@@ -2,7 +2,24 @@
 
 import { create } from 'zustand';
 
-export type GameSpeed = 1 | 2 | 4;
+/**
+ * The three tempos, plus pause.
+ *
+ * Half speed exists so a player can watch a shift change or a construction
+ * finish without the sol running away from them; 3x is the "nothing is
+ * happening, get me to morning" speed. Anything faster desynchronises the
+ * colonist animation from the simulation badly enough to look broken.
+ */
+export type GameSpeed = 0.5 | 1 | 3;
+
+export const GAME_SPEEDS: GameSpeed[] = [0.5, 1, 3];
+
+/** How each speed is written on its button. */
+export const SPEED_LABEL: Record<GameSpeed, string> = {
+  0.5: '½',
+  1: '1',
+  3: '3',
+};
 
 /**
  * The colony clock, measured in sols since landing.

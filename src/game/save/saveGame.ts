@@ -17,12 +17,13 @@ import { REGION_TILES } from '../core/constants';
 import { startingStock, type ResourceStock } from '../core/resources';
 import type { ResearchId } from '../progress/research';
 import type { CrewSnapshot } from '../state/useCrewStore';
+import type { Profile } from '../state/useProfileStore';
 import type { PlacedBuilding } from '../state/useColonyStore';
 import type { TerrainConfig } from '../world/terrain';
 
-export const SAVE_VERSION = 2;
-const STORAGE_KEY = 'kryonis.save.v2';
-const LEGACY_STORAGE_KEYS = ['kryonis.save.v1'];
+export const SAVE_VERSION = 3;
+const STORAGE_KEY = 'kryonis.save.v3';
+const LEGACY_STORAGE_KEYS = ['kryonis.save.v2', 'kryonis.save.v1'];
 
 export interface SaveGame {
   version: number;
@@ -43,11 +44,19 @@ export interface SaveGame {
 
   crew?: CrewSnapshot;
 
+  /** Who is running the colony and on what doctrine. Absent in v1 and v2. */
+  profile?: Profile;
+
+  /** Time controls, so a paused colony reloads paused. Absent before v3. */
+  time?: { paused: boolean; speed: number };
+
   progress: {
     unlocked: ResearchId[];
     missionIndex: number;
     activeMissionIds: string[];
     completed: { id: string; title: string; sol: number }[];
+    /** Research in flight. Absent before v3, and absent when nothing is running. */
+    project?: { id: ResearchId; elapsed: number; duration: number } | null;
   };
 }
 

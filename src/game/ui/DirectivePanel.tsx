@@ -2,9 +2,18 @@
 
 import { RESOURCES, formatAmount, type ResourceId } from '../core/resources';
 import { EVENTS } from '../progress/events';
+import { suggestNextStep } from '../progress/nextStep';
 import { useColonyStore } from '../state/useColonyStore';
+import { useCrewStore } from '../state/useCrewStore';
 import { useProgressStore } from '../state/useProgressStore';
 import { useTicker } from './useTicker';
+
+const STEP_TONE = {
+  critical: 'text-alert',
+  warn: 'text-warn',
+  info: 'text-bone',
+  good: 'text-good',
+} as const;
 
 /**
  * Current directives, and anything currently going wrong.
@@ -22,6 +31,9 @@ export function DirectivePanel() {
   const stats = useColonyStore((state) => state.stats);
   const stock = useColonyStore((state) => state.stock);
   const buildings = useColonyStore((state) => state.buildings);
+  const project = useProgressStore((state) => state.project);
+  const roster = useCrewStore((state) => state.roster);
+  const assignedResearcherId = useCrewStore((state) => state.assignedResearcherId);
 
   // Directives measure themselves; rebuild the snapshot they read.
   const counts: Record<string, number> = {};
@@ -44,8 +56,31 @@ export function DirectivePanel() {
     sols: 0,
   } as Parameters<(typeof active)[number]['measure']>[0];
 
+  /*
+   * The recommendation is separate from the directives on purpose. Directives
+   * are what the programme has asked for; this is what the colony needs right
+   * now, and when a life-support tank is emptying those are not the same thing.
+   */
+  const step = suggestNextStep({
+    stats,
+    stock,
+    counts,
+    totalBuildings,
+    vacancies: Math.max(0, stats.housing - roster.length),
+    hasResearchLead: assignedResearcherId !== null,
+    researchRunning: project !== null,
+    researchPoints: stock.research,
+  });
+
   return (
     <div className="glass anim-rise pointer-events-auto w-[16.5rem] overflow-hidden rounded-[3px]">
+      <div className="px-3 pb-2 pt-2.5">
+        <span className="t-micro">Next step</span>
+        <p className={`t-sm mt-1.5 leading-snug ${STEP_TONE[step.tone]}`}>{step.text}</p>
+      </div>
+
+      <span className="rule-x mx-3 block" />
+
       <div className="px-3 pb-1 pt-2.5">
         <span className="t-micro">Directives</span>
       </div>

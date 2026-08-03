@@ -21,11 +21,15 @@ import { Scene } from './Scene';
 export function GameCanvas() {
   const quality = useQuality();
   const detect = useSettingsStore((state) => state.detect);
+  const hydrate = useSettingsStore((state) => state.hydrate);
 
-  // Hardware detection touches the DOM and WebGL, so it has to wait for mount.
+  // Both touch browser-only APIs - WebGL for detection, localStorage for stored
+  // preferences - so both have to wait for mount. Stored preferences are read
+  // second so an explicit choice always wins over what the hardware suggests.
   useEffect(() => {
     detect();
-  }, [detect]);
+    hydrate();
+  }, [detect, hydrate]);
 
   return (
     <Canvas
