@@ -14,6 +14,7 @@ import {
 import { RESOURCES, canAfford, formatAmount, type ResourceId } from '../core/resources';
 import { useBuildStore } from '../state/useBuildStore';
 import { useColonyStore } from '../state/useColonyStore';
+import { useThumbnailStore } from '../state/useThumbnailStore';
 import { BUILDING_ICONS } from './buildingIcons';
 import { CrewIcon, PowerIcon } from './icons';
 
@@ -144,6 +145,7 @@ function Card({
 }) {
   const def = BUILDINGS[id];
   const Icon = BUILDING_ICONS[id];
+  const preview = useThumbnailStore((state) => state.images[id]);
 
   const material = (Object.entries(def.cost) as [ResourceId, number][]).find(
     ([resource]) => resource !== 'money',
@@ -172,13 +174,30 @@ function Card({
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_42%,#2a2018_0%,#12100e_74%)]" />
 
+        {/*
+          A real render of the structure, baked once from the actual model by
+          `ThumbnailBaker`. The SVG glyph stays as the fallback: the bake takes
+          a few frames, and an icon is far better than an empty square while it
+          runs - or forever, if the render target ever fails.
+        */}
         <div
           className={`absolute inset-0 grid place-items-center transition-transform duration-500 ${
-            locked ? 'text-faint/60' : 'text-steel group-hover:scale-[1.08]'
+            locked ? 'opacity-45 grayscale' : 'group-hover:scale-[1.08]'
           }`}
           style={{ transitionTimingFunction: 'var(--ease-spring)' }}
         >
-          <Icon className="h-12 w-12 min-[1180px]:h-[3.6rem] min-[1180px]:w-[3.6rem]" />
+          {preview ? (
+            <img
+              src={preview}
+              alt=""
+              draggable={false}
+              className="h-full w-full object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.55)]"
+            />
+          ) : (
+            <span className={locked ? 'text-faint/60' : 'text-steel'}>
+              <Icon className="h-12 w-12 min-[1180px]:h-[3.6rem] min-[1180px]:w-[3.6rem]" />
+            </span>
+          )}
         </div>
 
         {/* Footprint, bottom-left of the render, very quiet. */}

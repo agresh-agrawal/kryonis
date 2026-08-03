@@ -51,7 +51,16 @@ export const IMPORTED_MODELS: Partial<Record<BuildingId, string>> = {
   storage: 'kit-tank.glb',
 
   comms: 'kit-dish.glb',
-  solar: 'kit-panel.glb',
+
+  /*
+   * Solar deliberately keeps its procedural model.
+   *
+   * `kit-panel.glb` is a single flat quad - 0.0 m thick - which vanishes when
+   * seen edge-on and z-fights against its own foundation pad. The generated
+   * solar array is purpose-built for this game, and with dozens of them on
+   * screen at once it is the one structure where the procedural version is
+   * clearly the better answer.
+   */
 };
 
 const MODEL_PATH = '/models/';

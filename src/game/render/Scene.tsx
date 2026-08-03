@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { AudioController } from '../audio/AudioController';
 import { BuildingsLayer } from '../buildings/BuildingsLayer';
+import { ThumbnailBaker } from '../buildings/ThumbnailBaker';
 import { ColonistsLayer } from '../colonists/ColonistsLayer';
 import { BuildGrid } from '../build/BuildGrid';
 import { PlacementController } from '../build/PlacementController';
@@ -53,6 +54,9 @@ export function Scene() {
 
       <TerrainMesh terrain={terrain} quality={quality} />
       <Boulders terrain={terrain} quality={quality} />
+
+      {/* Bakes the build-deck previews once, using this same renderer. */}
+      <ThumbnailBaker />
 
       <BuildingsLayer terrain={terrain} quality={quality} />
       <ColonistsLayer terrain={terrain} quality={quality} />

@@ -41,7 +41,6 @@ import {
   joinPrimitives,
   normals,
   prune,
-  quantize,
   simplify,
   weld,
 } from '@gltf-transform/functions';
@@ -401,7 +400,18 @@ for (const target of TARGETS) {
    * procedural buildings are faceted too, so this is also what makes an
    * imported model sit next to a generated one without looking pasted in.
    */
-  await document.transform(normals({ overwrite: true }), quantize(), prune(), dedup());
+  /*
+   * Normals regenerated; positions deliberately NOT quantised.
+   *
+   * `quantize()` normalises positions into +/-1 and moves the real scale onto
+   * the node transform. It saves a few hundred kilobytes across the whole set,
+   * and in exchange every consumer has to remember to compose the node matrix
+   * before reading a vertex. That indirection is exactly the kind of thing that
+   * fails silently - a model renders at 1/9th size and nothing errors - so for
+   * three megabytes of total payload it is not worth it. Plain float positions
+   * in real metres are what the rest of the pipeline assumes.
+   */
+  await document.transform(normals({ overwrite: true }), prune(), dedup());
 
   // Textures and materials are not used at runtime; removing them is most of
   // the file-size win on models like the rocket.
