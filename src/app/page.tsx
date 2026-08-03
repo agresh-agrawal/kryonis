@@ -10,6 +10,7 @@ import { BootVideo, consumeTrailerRequest } from '@/game/ui/BootVideo';
 import { BuildDeck } from '@/game/ui/BuildDeck';
 import { CodexConsole } from '@/game/ui/CodexConsole';
 import { CrewConsole } from '@/game/ui/CrewConsole';
+import { DirectiveConsole } from '@/game/ui/DirectiveConsole';
 import { DirectivePanel } from '@/game/ui/DirectivePanel';
 import { Dock, type DockKey } from '@/game/ui/Dock';
 import { FloatingInspector } from '@/game/ui/FloatingInspector';
@@ -103,7 +104,11 @@ export default function Page() {
    * steal a click or a keystroke.
    */
   const consoleSection =
-    section === 'crew' || section === 'research' || section === 'territory' || section === 'codex'
+    section === 'crew' ||
+    section === 'research' ||
+    section === 'territory' ||
+    section === 'codex' ||
+    section === 'missions'
       ? section
       : null;
 
@@ -195,6 +200,9 @@ export default function Page() {
         <TerritoryConsole onClose={closeConsole} />
       ) : null}
       {started && consoleSection === 'codex' ? <CodexConsole onClose={closeConsole} /> : null}
+      {started && consoleSection === 'missions' ? (
+        <DirectiveConsole onClose={closeConsole} />
+      ) : null}
 
       <Toasts />
 

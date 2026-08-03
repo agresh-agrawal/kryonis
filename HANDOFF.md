@@ -3,7 +3,7 @@
 Browser-based 3D Mars colony builder. This document is the complete context
 needed to continue the project in a fresh session.
 
-**Status: M1–M8 complete. V2 Pass 1 complete.** Next up is V2 Pass 2 —
+**Status: M1–M8 complete. V2 Pass 1 + asset import complete.** Next is V2 Pass 2 —
 see `KRYONIS_V2_PLAN.md` for the agreed scope and the decisions behind it,
 and `KRYONIS_ASSET_SHOPPING_LIST.md` (+ `.pdf`) for the model/texture brief.
 
@@ -142,6 +142,9 @@ canvases from periodic value noise.
 | 64% of the map unbuildable | High-frequency octaves in mountain noise created micro-slopes above the buildable threshold everywhere. | Fewer octaves; slope sampled at tile scale, not half-tile. |
 | Territory button opened nothing | `Dock` had a `territory` key but `page.tsx` had no branch for it, so the section switched and the right rail fell through to the directive panel. A dead button that looked alive. | `TerritoryConsole`. **Lesson: `DockKey` and the section switch must be changed together.** |
 | Buildings floating above the ground | Structures are seated at the *highest* corner of their footprint so nothing is ever buried — which leaves the downhill corners unsupported on any slope. | `FoundationLayer`: one instanced plinth per building, filling from the seat height down to the low corner. Do not "fix" this by lowering the buildings. |
+| Imported models silently unused | three's `GLTFLoader` runs node names through `sanitizeNodeName`, which strips characters reserved for animation paths — including `:`. Meshes written as `mat:hull` arrived as `mathull`. Every model loaded, matched nothing, and fell back to procedural geometry with **no error at all**. | Pipeline writes `mat_<key>`. **Lesson: never put `:` or `.` in a glTF node name you intend to read back.** |
+| Downloaded model would not simplify | glTF-Transform v4's `weld` merges only *bitwise identical* vertices — there is no distance tolerance. With normals present, nothing welds on hard-surface geometry, so meshopt has no edges to collapse: the oil rig would not go below 76% at any ratio. | Strip normals → weld → simplify → regenerate normals. |
+| Models measured the wrong size | `flatten()` removes the node *hierarchy* but leaves each node's own transform in place; it does not touch vertex data. Anything reading raw accessors afterwards is reading local space. | `flattenAndBake()` in `tools/lib-gltf.mjs`. Meshes shared by several nodes must be deep-copied first, or baking one node moves the others. |
 | Small text unreadable | `--color-faint` and `--color-titanium` were both `#6d665e` — 3.5:1 on the void background, under the 4.5:1 needed for body text — and locked states were expressed as `opacity-40` on top of that. | Both colours lifted above 4.5:1; locked/blocked/owned states now use the `state-*` utilities in `globals.css`, which keep full text contrast and change the *container* instead. |
 
 **Lesson worth keeping:** the dev-server log buffer is cumulative since server
@@ -171,8 +174,9 @@ Restart the server before trusting a "still failing" log.
   fabricator), logistics (depot, rover garage, cargo pad), habitation (quarters
   tier 2, canteen, recreation dome), support (radiator field, dust filtration).
 - **Minimap accuracy** — real deposits and a click-to-move camera.
-- **Swap in downloaded GLB models** as they arrive. Wiring point is
-  `buildParts()` in `catalog.ts`; brief is in `KRYONIS_ASSET_SHOPPING_LIST.md`.
+- **Which imported model is which** is still partly guesswork. The kit props
+  were identified from their proportions, not by looking at them; swapping an
+  assignment is a one-line change in `IMPORTED_MODELS`.
 - **Trade/Exchange** — greyed in the dock.
 - Terrain generation runs on the main thread (~1–2s stall at load). Now hidden
   behind the intro video rather than eliminated; a Web Worker is still the real
@@ -191,8 +195,29 @@ Restart the server before trusting a "still failing" log.
   *ongoing* conditions; toasts are for *moments*. They are not interchangeable.
 - **Doctrine is applied in `initialise()`**, not on the new-game screen, so a
   reset rebuilds the same start from the profile.
-- **`window.kryonisDebug`** (dev builds only) has `sols`, `setTimeOfDay()` and
-  `grant({research: 500})` for reaching a state without playing to it.
+- **`window.kryonisDebug`** (dev builds only) has `sols`, `setTimeOfDay()`,
+  `grant({research: 500})` and `models()` — the last prints which structures are
+  on a downloaded model and which fell back to procedural.
+
+## 9. The asset pipeline
+
+Downloaded models are **not** loaded as-is. `tools/build-models.mjs` imports
+*geometry only*, maps each source material onto the game's own `MaterialKey`
+palette, and emits one mesh per key named `mat_<key>`. The runtime
+(`importedModels.ts`) reads those and produces the same `BuildingModel` shape
+`buildModel()` produces, so imported and procedural buildings are identical
+downstream — same instancing, same construction animation, same plinths, same
+sampler budget.
+
+```bash
+node tools/inspect-models.mjs "Models i have added self"   # what is in a file
+node tools/split-kit.mjs <scene.glb> <outDir> 1.6          # break a diorama up
+node tools/build-models.mjs                                # build public/models
+```
+
+168 MB of source became 3.0 MB across 13 models. `IMPORTED_MODELS` in
+`src/game/buildings/importedModels.ts` maps structure → file; delete an entry to
+send that structure back to its procedural model.
 
 ---
 
