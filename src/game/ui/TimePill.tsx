@@ -74,14 +74,14 @@ export function TimePill() {
             aria-pressed={!paused && speed === value}
             aria-label={`${value}x speed`}
             title={`${SPEED_HINT[value]} (${index + 1})`}
-            className={`press h-7 w-7 rounded-[2px] text-[0.72rem] transition-colors min-[1180px]:h-8 min-[1180px]:w-8 min-[1180px]:text-[0.78rem] ${
+            className={`press t-num h-7 min-w-[2.1rem] rounded-[2px] px-1 text-[0.68rem] transition-colors min-[1180px]:h-8 min-[1180px]:min-w-[2.4rem] min-[1180px]:text-[0.72rem] ${
               !paused && speed === value
                 ? 'bg-white/10 text-dust'
                 : 'text-titanium hover:bg-white/5 hover:text-bone'
             }`}
           >
             {SPEED_LABEL[value]}
-            <span className="text-[0.62em] opacity-70">×</span>
+            <span className="text-[0.8em] opacity-70">x</span>
           </button>
         ))}
       </div>

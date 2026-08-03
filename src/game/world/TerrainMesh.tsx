@@ -28,7 +28,18 @@ const COLOR_REGOLITH_DARK = new THREE.Color(PALETTE.regolithDark);
 const COLOR_DUST = new THREE.Color(PALETTE.dust);
 const COLOR_BASALT = new THREE.Color(PALETTE.basalt);
 const COLOR_LAVA = new THREE.Color(PALETTE.lava);
-const COLOR_ICE = new THREE.Color(PALETTE.ice);
+/*
+ * Two ice tones rather than one.
+ *
+ * Clean ice is what sits in shadowed hollows and freshly sublimated patches;
+ * dusty ice is what most of a Martian ice field actually looks like, because
+ * dust settles on it continuously. Mixing between them by the terrain's own
+ * mottle field is what stops an ice sheet reading as a flat sticker.
+ */
+const COLOR_ICE_CLEAN = new THREE.Color('#d6e6ec');
+const COLOR_ICE_DUSTY = new THREE.Color('#9db0b4');
+/** Reused per vertex so shading a 90k-vertex mesh allocates nothing. */
+const ICE_SCRATCH = new THREE.Color();
 
 /** Grey-blue basaltic sand, the counterweight to the ochre dust. */
 const COLOR_BASALT_SAND = new THREE.Color('#6b6357');
@@ -77,6 +88,11 @@ export function TerrainMesh({ terrain, quality }: TerrainMeshProps) {
 
     // Pass 2: shade.
     const colors = new Float32Array(vertexCount * 3);
+    // How icy each vertex is, handed to the shader so ice can be *shiny*.
+    // Colour alone cannot make ice read as ice: what distinguishes it from pale
+    // dust is that it reflects, and reflectance is a material property the
+    // vertex colour channel cannot carry.
+    const iceness = new Float32Array(vertexCount);
     const scratch = new THREE.Color();
 
     for (let i = 0; i < vertexCount; i++) {
@@ -97,7 +113,27 @@ export function TerrainMesh({ terrain, quality }: TerrainMeshProps) {
       scratch.lerp(COLOR_REGOLITH_DARK, blend.rock * 0.6);
       scratch.lerp(COLOR_BASALT, blend.slopeRock * 0.55);
       scratch.lerp(COLOR_LAVA, blend.lava * 0.9);
-      scratch.lerp(COLOR_ICE, blend.ice * 0.92);
+
+      /*
+       * Ice.
+       *
+       * A single flat lerp to one pale blue is what made ice fields look like
+       * spilled paint. Real exposed ice on Mars is filthy - dust blows over it
+       * constantly, it sublimates unevenly, and it sits in shadowed hollows
+       * where it is bluer and in exposed patches where it is nearly white.
+       *
+       * Two tones mixed by the existing fine mottle field give that variation
+       * for free, and the dusty tone keeps it tied to the ground it sits in
+       * rather than floating on top as a separate material.
+       */
+      if (blend.ice > 0.001) {
+        const grime = blend.mottle;
+        scratch.lerp(
+          ICE_SCRATCH.copy(COLOR_ICE_CLEAN).lerp(COLOR_ICE_DUSTY, grime * 0.75),
+          blend.ice * 0.94,
+        );
+      }
+      iceness[i] = blend.ice;
 
       // Broad regional tinting.
       //
@@ -122,6 +158,7 @@ export function TerrainMesh({ terrain, quality }: TerrainMeshProps) {
     }
 
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('aIce', new THREE.BufferAttribute(iceness, 1));
     geo.computeBoundingSphere();
 
     return geo;
@@ -144,21 +181,68 @@ export function TerrainMesh({ terrain, quality }: TerrainMeshProps) {
     return normal;
   }, [terrain.seed, quality.tier, quality.anisotropy]);
 
-  // Geometry and canvas textures are large; release them when the region changes.
+  /**
+   * The ground material, with ice patched into the standard shader.
+   *
+   * Roughness has to vary across the surface: dust is completely matte and ice
+   * is not, and that difference in *reflectance* is what the eye actually reads
+   * as "that is ice". A roughness map would cost a texture unit, and the
+   * comment above explains why there is no unit to spare - so the value is
+   * carried per-vertex in an attribute instead, which costs one float and no
+   * samplers.
+   *
+   * `onBeforeCompile` is used rather than a custom material so everything else
+   * three gives us - shadows, fog, tone mapping, the normal map - keeps
+   * working untouched.
+   */
+  const material = useMemo(() => {
+    const standard = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 1,
+      metalness: 0,
+      normalMap,
+      normalScale: new THREE.Vector2(1.15, 1.15),
+      envMapIntensity: 0.4,
+      dithering: true,
+    });
+
+    standard.onBeforeCompile = (shader) => {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nattribute float aIce;\nvarying float vIce;',
+        )
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvIce = aIce;');
+
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vIce;')
+        // Ice is smooth and slightly reflective; regolith is neither. Clamping
+        // the floor at 0.18 keeps it from becoming a mirror, which would look
+        // like polished plastic rather than dirty water ice.
+        .replace(
+          '#include <roughnessmap_fragment>',
+          `#include <roughnessmap_fragment>
+          roughnessFactor = mix( roughnessFactor, 0.18, clamp( vIce, 0.0, 1.0 ) );`,
+        )
+        // A touch of specular lift so the sun catches ice fields at the low
+        // angles this game spends most of its day in.
+        .replace(
+          '#include <metalnessmap_fragment>',
+          `#include <metalnessmap_fragment>
+          metalnessFactor = mix( metalnessFactor, 0.08, clamp( vIce, 0.0, 1.0 ) );`,
+        );
+    };
+
+    return standard;
+  }, [normalMap]);
+
+  // Geometry, materials and canvas textures are large; release them when the
+  // region changes.
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => normalMap.dispose(), [normalMap]);
+  useEffect(() => () => material.dispose(), [material]);
 
   return (
-    <mesh geometry={geometry} receiveShadow castShadow name="terrain">
-      <meshStandardMaterial
-        vertexColors
-        roughness={1}
-        metalness={0}
-        normalMap={normalMap}
-        normalScale={new THREE.Vector2(1.15, 1.15)}
-        envMapIntensity={0.4}
-        dithering
-      />
-    </mesh>
+    <mesh geometry={geometry} material={material} receiveShadow castShadow name="terrain" />
   );
 }

@@ -24,11 +24,11 @@ import { ColonistsIcon, CreditsIcon, ResearchIcon } from './icons';
 
 /** What each speciality is actually for, in the player's terms. */
 const SKILL_BRIEF: Record<CrewSkill, string> = {
-  Engineering: 'Power systems, arrays and reactors. Leads energy research.',
-  Biology: 'Air, water and crops. Leads life-support research.',
-  Geology: 'Ore, ice and extraction. Leads industry research.',
-  Operations: 'Logistics, morale and shift planning. Leads colony research.',
-  Medicine: 'Keeps everyone working. Adapts to any research branch.',
+  Engineering: 'Keeps the power on. Best at Energy research.',
+  Biology: 'Air, water and things that grow. Best at Life Support research.',
+  Geology: 'Knows where to dig. Best at Industry research.',
+  Operations: 'Runs the place day to day. Best at Colony research.',
+  Medicine: 'Keeps everyone on their feet. Good at any research.',
 };
 
 /**
@@ -78,14 +78,14 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
   };
 
   const blockedReason = vacancies <= 0
-    ? 'No spare quarters. Build a Habitat Dome to open a vacancy.'
+    ? 'Nowhere to put them. Build a Habitat Dome first.'
     : !affordable
-      ? `Short ${formatAmount(cost - stock.money)} credits.`
+      ? `You need ${formatAmount(cost - stock.money)} more credits.`
       : null;
 
   return (
     <Console
-      title="CREW"
+      title="YOUR CREW"
       legend={`${roster.length} aboard · ${vacancies} ${vacancies === 1 ? 'vacancy' : 'vacancies'}`}
       onClose={onClose}
     >
@@ -105,14 +105,14 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
               label="Research lead"
               value={assigned ? assigned.name.split(' ')[0] : 'None'}
               tone={assigned ? 'accent' : 'warn'}
-              note={assigned ? assigned.skill : 'Research runs slowly'}
+              note={assigned ? assigned.skill : 'Research is slow'}
             />
           </div>
 
           <ConsoleSection
             className="mt-7"
             title="Roster"
-            hint="Select a colonist to put them in charge of research"
+            hint="Tap someone to put them in charge of research"
           >
             <div className="grid gap-3 min-[760px]:grid-cols-2 min-[1500px]:grid-cols-3">
               {roster.map((member) => (
@@ -135,7 +135,7 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
                 >
                   <div className="text-center">
                     <span className="tag text-titanium">Vacant</span>
-                    <p className="t-sm mt-2.5 text-faint">Quarters ready for a new arrival</p>
+                    <p className="t-sm mt-2.5 text-faint">A free bed. Hire someone.</p>
                   </div>
                 </div>
               ))}
@@ -201,9 +201,8 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
                   <span className="t-micro text-warn">No lead assigned</span>
                 </span>
                 <p className="t-sm mt-2 leading-snug text-ash">
-                  Research still progresses, at just over half speed. Pick a colonist from the
-                  roster to lead it — a specialist in the matching branch is both cheaper and
-                  considerably faster.
+                  Research still crawls along at about half speed. Put someone in charge and it
+                  speeds up — pick a specialist in the right field and it gets cheaper too.
                 </p>
               </div>
             )}
@@ -308,7 +307,7 @@ function AssignmentSummary({
       <p className="t-sm mt-3 leading-snug text-ash">
         {node
           ? `Currently working on ${node.name}.`
-          : 'Standing by. Start a project from the research screen.'}
+          : 'Waiting for orders. Start a project on the Research screen.'}
       </p>
     </div>
   );

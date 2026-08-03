@@ -67,7 +67,7 @@ export function TerritoryConsole({ onClose }: { onClose: () => void }) {
         <div className="min-w-0">
           <ConsoleSection
             title="Crater survey"
-            hint="Bronze ring is your perimeter · dashed ring is the next claim"
+            hint="Bronze ring is yours · dashed ring is what you would buy next"
           >
             <div className="flex justify-center rounded-[3px] border border-white/[0.07] bg-black/40 p-4">
               <ClaimMap
@@ -118,8 +118,7 @@ export function TerritoryConsole({ onClose }: { onClose: () => void }) {
                 </div>
 
                 <p className="t-sm mt-2 leading-snug text-ash">
-                  A {UNLOCK_STEP} m band around the current perimeter. This is what the survey
-                  finds in it:
+                  A {UNLOCK_STEP} m ring around what you already own. Here is what is in it:
                 </p>
 
                 {nextRing ? (
@@ -154,12 +153,12 @@ export function TerritoryConsole({ onClose }: { onClose: () => void }) {
                   onClick={claim}
                   className="press mt-4 w-full rounded-[3px] bg-dust py-3 text-void transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:bg-white/[0.06] disabled:text-faint"
                 >
-                  <span className="t-md">Claim this band</span>
+                  <span className="t-md">Claim this ring</span>
                 </button>
 
                 {!affordable ? (
                   <p className="t-sm mt-2.5 text-warn">
-                    Short {formatAmount(cost - money)} credits.
+                    You need {formatAmount(cost - money)} more credits.
                   </p>
                 ) : null}
               </div>

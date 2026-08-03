@@ -4,6 +4,8 @@ import { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { invalidateModelCache } from '../buildings/catalog';
+import { preloadImportedModels } from '../buildings/importedModels';
 import { useQuality, useSettingsStore } from '../state/useSettingsStore';
 import { Scene } from './Scene';
 
@@ -30,6 +32,25 @@ export function GameCanvas() {
     detect();
     hydrate();
   }, [detect, hydrate]);
+
+  /*
+   * Downloaded models are fetched here, at canvas mount, which is behind the
+   * intro video. Three megabytes lands long before the player can place
+   * anything.
+   *
+   * The cache has to be dropped afterwards: any structure whose geometry was
+   * requested while the download was still in flight cached its procedural
+   * version, and would otherwise keep it for the rest of the session.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    preloadImportedModels().then(() => {
+      if (!cancelled) invalidateModelCache();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <Canvas

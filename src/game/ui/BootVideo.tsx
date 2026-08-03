@@ -13,7 +13,7 @@ const MAX_TRAILER_MS = 4 * 60 * 1000;
 const SEEN_KEY = 'kryonis:seenTrailer';
 const REPLAY_KEY = 'kryonis:replayTrailer';
 
-/** Clears the first-run flag so the trailer plays again next launch. */
+/** Asks for the trailer to play on the next launch, from Settings. */
 export function requestTrailerReplay(): void {
   try {
     window.localStorage.setItem(REPLAY_KEY, '1');
@@ -22,49 +22,60 @@ export function requestTrailerReplay(): void {
   }
 }
 
+/** Whether a launch-time trailer has been requested, and clears the request. */
+export function consumeTrailerRequest(): boolean {
+  try {
+    const wanted = window.localStorage.getItem(REPLAY_KEY) === '1';
+    if (wanted) window.localStorage.removeItem(REPLAY_KEY);
+    return wanted;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The opening video.
  *
- * The trailer plays once, on a player's first ever launch, and the short
- * loading clip on every launch after that.
+ * Two variants, and *when* each plays is the whole design:
  *
- * The trailer is a very large file, and the decision was made deliberately to
- * ship it at full size rather than compress it. Two things make that survivable:
+ * - `boot` is the short clip. It covers the page load, every time.
+ * - `trailer` plays when a colony is actually founded - after the player has
+ *   named their programme and picked a landing site, immediately before they
+ *   see Mars for the first time. Tying it to "first ever visit to this URL"
+ *   instead meant that creating a new colony showed no trailer at all, which
+ *   is exactly backwards: founding the colony *is* the moment it is for.
  *
- * 1. The 3D world mounts *behind* this screen rather than after it. Terrain
- *    generation, texture baking and shader compilation all happen while the
- *    video plays, so the wait buys something instead of being spent twice.
+ * The trailer is a very large file, and shipping it at full size was a
+ * deliberate decision. Two things make that survivable:
+ *
+ * 1. The 3D world mounts *behind* this screen rather than after it, so terrain
+ *    generation and shader compilation happen while the video plays.
  * 2. Skip is available from the first frame. A player who does not want a
  *    three-minute trailer must never be made to sit through the buffering of
- *    one, and the skip is the only control on screen so it cannot be missed.
+ *    one.
  *
- * The progress bar under the title reports *buffering*, not playback - it is
- * answering "is this thing working", which is the only question a player has
- * while staring at a black rectangle.
+ * The progress bar reports *buffering*, not playback - it answers "is this
+ * thing working", which is the only question a player has while looking at a
+ * black rectangle.
  */
-export function BootVideo({ onComplete }: { onComplete: () => void }) {
+export function BootVideo({
+  onComplete,
+  variant = 'boot',
+}: {
+  onComplete: () => void;
+  variant?: 'boot' | 'trailer';
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [buffered, setBuffered] = useState(0);
   const [playing, setPlaying] = useState(false);
 
-  const [isTrailer] = useState(() => {
-    try {
-      if (window.localStorage.getItem(REPLAY_KEY) === '1') return true;
-      return window.localStorage.getItem(SEEN_KEY) !== '1';
-    } catch {
-      // Without storage we cannot tell first run from tenth. Assume returning,
-      // because a trailer forced on every launch is far worse than one missed.
-      return false;
-    }
-  });
-
+  const isTrailer = variant === 'trailer';
   const [src, setSrc] = useState(() => (isTrailer ? TRAILER_VIDEO : BOOT_VIDEO));
 
   const finish = useCallback(() => {
     try {
       window.localStorage.setItem(SEEN_KEY, '1');
-      window.localStorage.removeItem(REPLAY_KEY);
     } catch {
       // Ignore storage failures (private browsing, quota).
     }
@@ -126,8 +137,8 @@ export function BootVideo({ onComplete }: { onComplete: () => void }) {
               {blocked
                 ? 'Playback blocked — press Skip'
                 : isTrailer
-                  ? 'Loading trailer · the colony is being prepared behind it'
-                  : 'Preparing the colony'}
+                  ? 'Loading the briefing · your colony is being built behind it'
+                  : 'Warming up the reactors'}
             </span>
           </span>
         ) : null}
@@ -142,7 +153,7 @@ export function BootVideo({ onComplete }: { onComplete: () => void }) {
           autoFocus
           className="press glass pointer-events-auto rounded-[3px] px-5 py-2.5 text-titanium hover:text-bone"
         >
-          <span className="t-micro">{isTrailer ? 'Skip intro' : 'Enter colony'}</span>
+          <span className="t-micro">{isTrailer ? 'Skip briefing' : 'Enter colony'}</span>
         </button>
       </div>
     </div>

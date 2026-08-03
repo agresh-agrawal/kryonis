@@ -14,9 +14,14 @@ export type GameSpeed = 0.5 | 1 | 3;
 
 export const GAME_SPEEDS: GameSpeed[] = [0.5, 1, 3];
 
-/** How each speed is written on its button. */
+/**
+ * How each speed is written on its button.
+ *
+ * Digits, not a vulgar fraction. "1/2x" is what a spreadsheet says; every game
+ * a player has already used writes it 0.5x, and matching that is free.
+ */
 export const SPEED_LABEL: Record<GameSpeed, string> = {
-  0.5: '½',
+  0.5: '0.5',
   1: '1',
   3: '3',
 };

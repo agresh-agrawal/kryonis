@@ -1,0 +1,165 @@
+[
+  {
+    "source": "reactor.glb",
+    "out": "reactor.glb",
+    "beforeMB": 44.3,
+    "afterMB": 0.42,
+    "beforeTris": 1782728,
+    "afterTris": 8795,
+    "materials": [
+      "metal",
+      "dark",
+      "hull",
+      "solar"
+    ]
+  },
+  {
+    "source": "offshore_oil_rig.glb",
+    "out": "refinery.glb",
+    "beforeMB": 87.5,
+    "afterMB": 1.27,
+    "beforeTris": 1162694,
+    "afterTris": 26443,
+    "materials": [
+      "metal",
+      "glass",
+      "concrete",
+      "dark",
+      "hazard"
+    ]
+  },
+  {
+    "source": "Rocket.glb",
+    "out": "rocket.glb",
+    "beforeMB": 35.9,
+    "afterMB": 0.67,
+    "beforeTris": 28121,
+    "afterTris": 14000,
+    "materials": [
+      "metal"
+    ]
+  },
+  {
+    "source": "_kit/kit-01.glb",
+    "out": "kit-block-a.glb",
+    "beforeMB": 0.1,
+    "afterMB": 0.13,
+    "beforeTris": 2606,
+    "afterTris": 2606,
+    "materials": [
+      "metal",
+      "glass",
+      "hull",
+      "dark"
+    ]
+  },
+  {
+    "source": "_kit/kit-02.glb",
+    "out": "kit-block-b.glb",
+    "beforeMB": 0.1,
+    "afterMB": 0.13,
+    "beforeTris": 2606,
+    "afterTris": 2606,
+    "materials": [
+      "metal",
+      "glass",
+      "hull",
+      "dark"
+    ]
+  },
+  {
+    "source": "_kit/kit-03.glb",
+    "out": "kit-block-c.glb",
+    "beforeMB": 0.1,
+    "afterMB": 0.11,
+    "beforeTris": 2160,
+    "afterTris": 2160,
+    "materials": [
+      "metal",
+      "glass",
+      "hull",
+      "dark"
+    ]
+  },
+  {
+    "source": "_kit/kit-04.glb",
+    "out": "kit-lab.glb",
+    "beforeMB": 0.1,
+    "afterMB": 0.08,
+    "beforeTris": 1710,
+    "afterTris": 1710,
+    "materials": [
+      "metal",
+      "glass",
+      "hull",
+      "dark"
+    ]
+  },
+  {
+    "source": "_kit/kit-05.glb",
+    "out": "kit-plant-a.glb",
+    "beforeMB": 0,
+    "afterMB": 0.05,
+    "beforeTris": 1088,
+    "afterTris": 1088,
+    "materials": [
+      "metal"
+    ]
+  },
+  {
+    "source": "_kit/kit-06.glb",
+    "out": "kit-plant-b.glb",
+    "beforeMB": 0,
+    "afterMB": 0.05,
+    "beforeTris": 1024,
+    "afterTris": 1024,
+    "materials": [
+      "metal"
+    ]
+  },
+  {
+    "source": "_kit/kit-07.glb",
+    "out": "kit-plant-c.glb",
+    "beforeMB": 0,
+    "afterMB": 0.05,
+    "beforeTris": 960,
+    "afterTris": 960,
+    "materials": [
+      "metal"
+    ]
+  },
+  {
+    "source": "_kit/kit-08.glb",
+    "out": "kit-tank.glb",
+    "beforeMB": 0,
+    "afterMB": 0.04,
+    "beforeTris": 772,
+    "afterTris": 772,
+    "materials": [
+      "metal"
+    ]
+  },
+  {
+    "source": "_kit/kit-09.glb",
+    "out": "kit-dish.glb",
+    "beforeMB": 0,
+    "afterMB": 0.03,
+    "beforeTris": 600,
+    "afterTris": 600,
+    "materials": [
+      "metal",
+      "glass"
+    ]
+  },
+  {
+    "source": "_kit/kit-10.glb",
+    "out": "kit-panel.glb",
+    "beforeMB": 0,
+    "afterMB": 0.01,
+    "beforeTris": 128,
+    "afterTris": 128,
+    "materials": [
+      "metal"
+    ]
+  }
+]

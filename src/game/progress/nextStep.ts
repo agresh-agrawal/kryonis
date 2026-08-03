@@ -37,32 +37,32 @@ export function suggestNextStep(ctx: NextStepContext): NextStep {
 
   // --- Life support first. Nothing else matters if people are dying. ------
   if (stock.oxygen <= 0) {
-    return { text: 'Oxygen is out — build an oxygen plant now', tone: 'critical' };
+    return { text: 'Out of air! Build an oxygen plant now', tone: 'critical' };
   }
   if (stock.water <= 0) {
-    return { text: 'Water is out — build an ice extractor now', tone: 'critical' };
+    return { text: 'Out of water! Build an ice extractor now', tone: 'critical' };
   }
   if (stock.food <= 0) {
-    return { text: 'Food is out — build a greenhouse now', tone: 'critical' };
+    return { text: 'Out of food! Build a greenhouse now', tone: 'critical' };
   }
 
   // --- Then power, because it is what keeps life support running. ---------
   if (stats.powerProduction <= 0 && ctx.totalBuildings > 1) {
-    return { text: 'Nothing is generating power — build a solar array', tone: 'critical' };
+    return { text: 'No power at all — put up a solar array', tone: 'critical' };
   }
   if (stats.powerDemand > stats.powerProduction) {
-    return { text: 'Demand exceeds supply — add generation or a battery bank', tone: 'warn' };
+    return { text: 'You are using more power than you make — add solar or batteries', tone: 'warn' };
   }
 
   // --- Then the things that are about to become life support problems. ----
   if (!counts.oxygen) {
-    return { text: 'Build an oxygen plant before the tanks run down', tone: 'warn' };
+    return { text: 'Build an oxygen plant before the tanks empty', tone: 'warn' };
   }
   if (!counts.water) {
-    return { text: 'Build an ice extractor — water cannot be shipped in', tone: 'warn' };
+    return { text: 'Build an ice extractor — no one is shipping you water', tone: 'warn' };
   }
   if (!counts.greenhouse) {
-    return { text: 'Build a greenhouse before the food reserve runs out', tone: 'warn' };
+    return { text: 'Build a greenhouse before the food runs out', tone: 'warn' };
   }
 
   // --- Then growth. -------------------------------------------------------
@@ -73,20 +73,20 @@ export function suggestNextStep(ctx: NextStepContext): NextStep {
     };
   }
   if (stats.jobs > stats.population) {
-    return { text: 'Posts are unfilled — build housing, then hire', tone: 'info' };
+    return { text: 'Jobs going spare — build housing, then hire', tone: 'info' };
   }
   if (!counts.lab) {
-    return { text: 'Build a research laboratory to start generating research', tone: 'info' };
+    return { text: 'Build a research lab to start earning research', tone: 'info' };
   }
   if (!ctx.researchRunning && ctx.researchPoints > 0) {
-    return { text: 'Research points are idle — start a project', tone: 'info' };
+    return { text: 'Research points piling up — go spend them', tone: 'info' };
   }
   if (!ctx.hasResearchLead) {
-    return { text: 'Assign a crew member to lead research', tone: 'info' };
+    return { text: 'Put someone in charge of research', tone: 'info' };
   }
   if (stats.happiness < 0.5) {
-    return { text: 'Morale is low — more housing and space per colonist', tone: 'warn' };
+    return { text: 'People are unhappy — they need more room', tone: 'warn' };
   }
 
-  return { text: 'The colony is stable — expand the perimeter and grow', tone: 'good' };
+  return { text: 'All steady. Claim more land and keep growing', tone: 'good' };
 }

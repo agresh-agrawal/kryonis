@@ -14,6 +14,7 @@
 
 import type { ResourceBundle } from '../core/resources';
 import { DepositKind, TerrainKind } from '../world/terrain';
+import { getImportedModel } from './importedModels';
 import { buildModel, type BuildingModel } from './model';
 import {
   atriumParts,
@@ -553,10 +554,24 @@ const modelCache = new Map<BuildingId, BuildingModel>();
 export function getBuildingModel(id: BuildingId): BuildingModel {
   let model = modelCache.get(id);
   if (!model) {
-    model = buildModel(BUILDINGS[id].buildParts());
+    // A downloaded model wins when one loaded for this structure; otherwise the
+    // procedural parts are used. Both produce the same shape, so nothing
+    // downstream needs to know which it got.
+    model = getImportedModel(id) ?? buildModel(BUILDINGS[id].buildParts());
     modelCache.set(id, model);
   }
   return model;
+}
+
+/**
+ * Drops cached geometry so the next request rebuilds it.
+ *
+ * Called once after the imported models finish loading. Without it, any
+ * structure whose model was requested during the loading screen would keep its
+ * procedural version for the rest of the session.
+ */
+export function invalidateModelCache(): void {
+  modelCache.clear();
 }
 
 /**

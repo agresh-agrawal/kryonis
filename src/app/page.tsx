@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
 import { AutoSave } from '@/game/save/AutoSave';
-import { clearSave } from '@/game/save/saveGame';
-import { BootVideo } from '@/game/ui/BootVideo';
+import { clearSave, hasSave } from '@/game/save/saveGame';
+import { loadSave } from '@/game/save/useSaveGame';
+import { BootVideo, consumeTrailerRequest } from '@/game/ui/BootVideo';
 import { BuildDeck } from '@/game/ui/BuildDeck';
 import { CodexConsole } from '@/game/ui/CodexConsole';
 import { CrewConsole } from '@/game/ui/CrewConsole';
@@ -71,9 +72,19 @@ export default function Page() {
   const [section, setSection] = useState<DockKey>('overview');
   const [booted, setBooted] = useState(false);
 
-  // The colony does not start until a site is chosen. Autosave restoration
-  // happens behind this screen, so "Continue" is offered rather than assumed.
+  /*
+   * Whether a colony is running.
+   *
+   * A returning player is put straight back into their colony rather than being
+   * shown the new-game screen with a Continue button on it. Being asked to
+   * confirm that you would like to keep playing the game you were already
+   * playing is not a real choice - the save exists, so it is what you meant.
+   * Starting fresh is still available, from Settings, where a destructive action
+   * belongs.
+   */
   const [started, setStarted] = useState(false);
+  const [resuming, setResuming] = useState(true);
+  const [playTrailer, setPlayTrailer] = useState(false);
 
   const tool = useBuildStore((state) => state.tool);
   const cancel = useBuildStore((state) => state.cancel);
@@ -101,6 +112,23 @@ export default function Page() {
   useEffect(() => {
     if (tool === 'select' && deckOpen) setSection('overview');
   }, [tool, deckOpen]);
+
+  /*
+   * Restore the previous colony, once, on first mount.
+   *
+   * Deliberately not gated on `booted`: the save is small and restoring it is
+   * synchronous, so doing it while the intro video is still playing means the
+   * colony is already standing the moment the video ends.
+   *
+   * `loadSave` touches localStorage, so it cannot run during render or on the
+   * server.
+   */
+  useEffect(() => {
+    if (hasSave() && loadSave()) setStarted(true);
+    // "Replay intro" from Settings asks for the trailer on the next launch.
+    else if (consumeTrailerRequest()) setPlayTrailer(true);
+    setResuming(false);
+  }, []);
 
   const closeDeck = () => {
     setSection('overview');
@@ -144,7 +172,21 @@ export default function Page() {
       <GameCanvas />
       {booted ? null : <BootVideo onComplete={() => setBooted(true)} />}
       {started ? <AutoSave /> : null}
-      {booted && !started ? <NewColony onBegin={() => setStarted(true)} /> : null}
+      {booted && !started && !resuming ? (
+        <NewColony
+          onBegin={() => {
+            // Founding a colony is what the trailer is for, so it plays here
+            // rather than on first page load.
+            setPlayTrailer(true);
+            setStarted(true);
+          }}
+        />
+      ) : null}
+
+      {/* The founding briefing. Plays over the world, which is already built. */}
+      {playTrailer ? (
+        <BootVideo variant="trailer" onComplete={() => setPlayTrailer(false)} />
+      ) : null}
 
       {/* Full-screen consoles. Rendered above the HUD and replacing it. */}
       {started && consoleSection === 'crew' ? <CrewConsole onClose={closeConsole} /> : null}

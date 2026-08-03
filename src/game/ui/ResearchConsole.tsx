@@ -23,10 +23,10 @@ import { ResearchIcon } from './icons';
 
 /** What each branch is for, shown above its column. */
 const BRANCH_BRIEF: Record<ResearchBranch, string> = {
-  Energy: 'Generation, storage and the losses between them',
-  'Life Support': 'Air, water and food, and how little of each you waste',
-  Industry: 'Getting material out of the ground and into a usable form',
-  Colony: 'The people: morale, movement and how much room they need',
+  Energy: 'Make more power, waste less of it',
+  'Life Support': 'Air, water and food that go further',
+  Industry: 'Dig faster, refine better',
+  Colony: 'Happier crew, in less space',
 };
 
 /**
@@ -98,7 +98,7 @@ export function ResearchConsole({ onClose }: { onClose: () => void }) {
           label="Lead researcher"
           value={lead ? lead.name : 'Unassigned'}
           tone={lead ? 'normal' : 'warn'}
-          note={lead ? lead.skill : 'Projects run at 0.55×'}
+          note={lead ? lead.skill : 'Nobody in charge'}
         />
         <Readout label="Completed" value={`${completed}/${RESEARCH_IDS.length}`} />
         <Readout
@@ -122,8 +122,8 @@ export function ResearchConsole({ onClose }: { onClose: () => void }) {
         title="Projects"
         hint={
           project
-            ? 'One project runs at a time — finish or abandon the current one first'
-            : 'Select a project to begin'
+            ? 'One at a time — finish or drop the current one first'
+            : 'Pick something to work on'
         }
       >
         <div className="grid gap-x-5 gap-y-6 min-[860px]:grid-cols-2 min-[1440px]:grid-cols-4">
@@ -190,10 +190,10 @@ function ActiveProject({ onCancel }: { onCancel: () => void }) {
           <button
             type="button"
             onClick={onCancel}
-            title="Abandon this project. Points already spent are not refunded."
+            title="Drop this project. You will not get the points back."
             className="press rounded-[3px] border border-white/10 px-3 py-2 text-titanium transition-colors hover:border-alert/40 hover:text-alert"
           >
-            <span className="t-sm">Abandon</span>
+            <span className="t-sm">Drop it</span>
           </button>
         </div>
       </div>
@@ -288,10 +288,10 @@ function ProjectCard({
           <p className="t-sm leading-relaxed text-ash">{node.blurb}</p>
 
           {owned ? (
-            <p className="t-sm mt-3 text-dust">Already in service across the colony.</p>
+            <p className="t-sm mt-3 text-dust">Already running across the colony.</p>
           ) : !available ? (
             <p className="t-sm mt-3 text-faint">
-              Complete {prerequisite?.name ?? 'earlier work'} to open this project.
+              Finish {prerequisite?.name ?? 'the earlier work'} to unlock this.
             </p>
           ) : (
             <button
@@ -304,10 +304,10 @@ function ProjectCard({
                 {running
                   ? 'Running'
                   : blockedByOther
-                    ? 'Another project is running'
+                    ? 'Something else is running'
                     : affordable
                       ? `Begin · ${price} points`
-                      : `Needs ${price} points`}
+                      : `Need ${price} points`}
               </span>
             </button>
           )}
