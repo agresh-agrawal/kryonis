@@ -18,12 +18,15 @@
  *   2. Classify each source material into one of the game's own material keys,
  *      by colour and metalness. An imported model then looks like it belongs in
  *      the game rather than like a sticker on it.
- *   3. Merge every primitive sharing a key into one mesh named `mat:<key>`.
+ *   3. Merge every primitive sharing a key into one mesh named `mat_<key>`.
+ *      Underscore, not colon: three's GLTFLoader strips `:` from node names
+ *      as a reserved animation-path character, so `mat:hull` arrives in the
+ *      browser as `mathull` and the runtime cannot read the key back out.
  *   4. Normalise scale and origin: footprint fitted to its tile size, base at
  *      y = 0, centred on XZ. Downloaded models are authored at every
  *      conceivable scale and none of them agree on where the origin goes.
  *
- * The runtime loader then just reads meshes named `mat:*` and hands them to the
+ * The runtime loader then just reads meshes named `mat_*` and hands them to the
  * existing instancing path, which needs no changes at all.
  *
  * Usage:  node tools/build-models.mjs
@@ -175,7 +178,7 @@ function normalise(document, targetFootprint, targetHeight) {
 /**
  * Rebuilds the document as one mesh per material key.
  *
- * Primitives are re-parented onto new meshes named `mat:<key>`; the runtime
+ * Primitives are re-parented onto new meshes named `mat_<key>`; the runtime
  * reads those names and needs to know nothing else about the file.
  */
 function groupByMaterialKey(document) {
@@ -201,7 +204,7 @@ function groupByMaterialKey(document) {
   const counts = {};
 
   for (const [key, primitives] of buckets) {
-    const mesh = document.createMesh(`mat:${key}`);
+    const mesh = document.createMesh(`mat_${key}`);
 
     for (const prim of primitives) {
       // Materials are discarded at runtime, but a primitive with a dangling
@@ -236,7 +239,7 @@ function groupByMaterialKey(document) {
       for (const prim of primitives) mesh.addPrimitive(prim);
     }
 
-    scene.addChild(document.createNode(`mat:${key}`).setMesh(mesh));
+    scene.addChild(document.createNode(`mat_${key}`).setMesh(mesh));
     counts[key] = primitives.length;
   }
 

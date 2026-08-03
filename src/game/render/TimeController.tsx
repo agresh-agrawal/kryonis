@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 
+import type { BuildingId } from '../buildings/catalog';
+import { IMPORTED_MODELS, getImportedModel } from '../buildings/importedModels';
 import { SOL_DURATION_SECONDS } from '../core/constants';
 import { useColonyStore } from '../state/useColonyStore';
 import { dayFraction, useTimeStore, worldClock } from '../state/useTimeStore';
@@ -60,6 +62,22 @@ export function TimeController() {
       setTimeOfDay(fraction: number) {
         worldClock.sols = Math.floor(worldClock.sols) + fraction;
       },
+      /** Which structures ended up on a downloaded model rather than a built one. */
+      models() {
+        const rows = (Object.keys(IMPORTED_MODELS) as BuildingId[]).map((id) => {
+          const model = getImportedModel(id);
+          return {
+            building: id,
+            file: IMPORTED_MODELS[id],
+            loaded: Boolean(model),
+            materials: model ? Object.keys(model).join(', ') : '-',
+          };
+        });
+        // eslint-disable-next-line no-console
+        console.table(rows);
+        return `${rows.filter((r) => r.loaded).length}/${rows.length} imported models in use`;
+      },
+
       /** Tops up the ledger so a screen can be exercised without playing to it. */
       grant(bundle: Partial<Record<string, number>>) {
         useColonyStore.setState((state) => {

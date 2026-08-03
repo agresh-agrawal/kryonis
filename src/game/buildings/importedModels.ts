@@ -6,7 +6,7 @@
  * The offline pipeline (`tools/build-models.mjs`) has already done the hard
  * part: each GLB here contains nothing but geometry, pre-scaled to its
  * footprint, origin at the base centre, split into one mesh per material named
- * `mat:<key>` where the key names a material in this game's own library.
+ * `mat_<key>` where the key names a material in this game's own library.
  *
  * So all this has to do is read those meshes out and hand back exactly the same
  * `BuildingModel` shape that `buildModel()` produces from procedural parts. The
@@ -62,12 +62,30 @@ const loaded = new Map<BuildingId, BuildingModel>();
 let preloadPromise: Promise<void> | null = null;
 
 /**
+ * Recovers the material key from a loaded node's name.
+ *
+ * The offline pipeline writes `mat_<key>`, and reading it back is less
+ * straightforward than it looks: three's GLTFLoader runs every node name
+ * through `PropertyBinding.sanitizeNodeName`, which strips characters reserved
+ * for animation paths - including `:` and `.`. An earlier version of the
+ * pipeline used `mat:<key>`, which arrived in the browser as `mathull` and
+ * matched nothing, so every model loaded successfully and then silently fell
+ * back to procedural geometry.
+ *
+ * Underscore survives sanitising. Both spellings are accepted anyway, so a
+ * stale GLB built by an older pipeline still works.
+ */
+function materialKeyFromName(name: string): MaterialKey | null {
+  const match = /^mat[:_]?(.+)$/.exec(name);
+  return match ? (match[1] as MaterialKey) : null;
+}
+
+/**
  * Pulls one GLB apart into geometry-per-material-key.
  *
- * Meshes are named `mat:<key>` by the offline pipeline. World matrices are
- * still applied here even though the pipeline baked node transforms, because
- * the GLTF loader may introduce its own root transform for Y-up correction and
- * silently ignoring it would put every model on its side.
+ * World matrices are still applied here even though the pipeline baked node
+ * transforms, because the GLTF loader introduces its own root transform for
+ * Y-up correction and silently ignoring it would put every model on its side.
  */
 function extractModel(scene: THREE.Object3D): BuildingModel {
   const byKey = new Map<MaterialKey, THREE.BufferGeometry[]>();
@@ -77,9 +95,8 @@ function extractModel(scene: THREE.Object3D): BuildingModel {
   scene.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) return;
 
-    const name = child.name || '';
-    if (!name.startsWith('mat:')) return;
-    const key = name.slice(4) as MaterialKey;
+    const key = materialKeyFromName(child.name || '');
+    if (!key) return;
 
     const geometry = child.geometry.clone() as THREE.BufferGeometry;
     geometry.applyMatrix4(child.matrixWorld);
@@ -137,7 +154,7 @@ export function preloadImportedModels(): Promise<void> {
           // recognised - worse than a failure, because it would render an
           // invisible building. Treat it as a miss.
           if (Object.keys(model).length === 0) {
-            console.warn(`[models] ${file} contained no "mat:*" meshes; using procedural model`);
+            console.warn(`[models] ${file} contained no "mat_*" meshes; using procedural model`);
             return;
           }
 
