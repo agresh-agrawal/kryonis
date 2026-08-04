@@ -14,9 +14,22 @@
  * realism.
  */
 
+import * as THREE from 'three';
+
 import { Random } from '../core/rng';
-import { box, cylinder, unitSphere, type Part } from './model';
+import { box, cylinder, type Part } from './model';
 import type { MaterialKey } from './materials';
+
+/**
+ * A coarse sphere, for things that are two centimetres across.
+ *
+ * The shared `unitSphere()` is 24x14 segments - 672 triangles - which is right
+ * for a habitat dome and absurd for the core of a lettuce. Using it per plant
+ * put the greenhouse at 22,720 triangles, more than thirteen times the solar
+ * array, for detail that is invisible behind glazing. Six by four is four
+ * dozen triangles and reads identically at this size.
+ */
+const CROP_SPHERE = new THREE.SphereGeometry(1, 6, 4);
 
 /**
  * A wall-mounted control panel: housing, screen, and rows of buttons.
@@ -327,7 +340,7 @@ export function crops(
         const leaves = rand.int(5, 7);
 
         parts.push({
-          geo: unitSphere(),
+          geo: CROP_SPHERE,
           mat: 'foliageDeep',
           pos: [x, y + 0.05 * scale, z],
           scale: [0.07 * scale, 0.05 * scale, 0.07 * scale],
@@ -369,7 +382,7 @@ export function crops(
         // A seed head on the tallest stalks.
         if (height > 0.46) {
           parts.push({
-            geo: unitSphere(),
+            geo: CROP_SPHERE,
             mat: 'foliage',
             pos: [x, y + height + 0.028, z],
             scale: [0.026, 0.052, 0.026],

@@ -146,6 +146,17 @@ export function corridorParts(): Part[] {
     { geo: torus(0.47, 0.05, 14), mat: 'metal', pos: [-0.55, 0.62, 0], rot: [0, Math.PI / 2, 0] },
     { geo: torus(0.47, 0.05, 14), mat: 'metal', pos: [0.55, 0.62, 0], rot: [0, Math.PI / 2, 0] },
     ...viewports(2, [-0.3, 0.75, 0.42], [0.6, 0, 0], 0.11),
+
+    // Cable and air ducting clipped along the outside of the tube. A bare
+    // pressurised tube looks unfinished; a serviced one looks connected.
+    { geo: cylinder(0.045, 1.5, 6), mat: 'dark', pos: [0, 0.28, 0.4], rot: [0, 0, Math.PI / 2] },
+    { geo: cylinder(0.045, 1.5, 6), mat: 'dark', pos: [0, 0.28, -0.4], rot: [0, 0, Math.PI / 2] },
+    { geo: box(0.16, 0.1, 0.1), mat: 'metal', pos: [-0.4, 0.28, 0.4] },
+    { geo: box(0.16, 0.1, 0.1), mat: 'metal', pos: [0.4, 0.28, -0.4] },
+
+    // Floodlight on the tunnel side - these are the paths crew walk at night.
+    { geo: box(0.14, 0.1, 0.1), mat: 'window', pos: [0, 0.95, 0.4] },
+
     ...foundation(2.2, 1.4, 0.12),
   ];
 }
@@ -154,29 +165,66 @@ export function corridorParts(): Part[] {
 // Power
 // ---------------------------------------------------------------------------
 
+/**
+ * The solar array.
+ *
+ * Worth more care than anything else in the catalog, because there will be
+ * dozens of them on screen and they are the first thing a player ever builds.
+ * A real tracking array is not three slabs on posts - it is a torque tube on
+ * bearings, driven by an actuator, feeding a combiner box through cable trays,
+ * and every one of those parts is visible from above.
+ */
 export function solarFarmParts(): Part[] {
   const parts: Part[] = [...foundation(3.7, 3.7, 0.12)];
 
-  // Three tracking rows tilted toward the noon sun.
   for (let row = 0; row < 3; row++) {
     const z = (row - 1) * 1.15;
-    parts.push({
-      geo: box(3.3, 0.05, 0.95),
-      mat: 'solar',
-      pos: [0, 0.72, z],
-      rot: [-0.52, 0, 0],
-    });
-    // Panel frame and torque tube.
+
+    // The panel: individual cells rather than one dark slab. Real modules are
+    // a grid, and the grid is what catches the low sun as a pattern instead of
+    // as a flat sheet.
+    for (let cell = 0; cell < 6; cell++) {
+      const x = -1.38 + cell * 0.552;
+      parts.push({
+        geo: box(0.5, 0.05, 0.9),
+        mat: 'solar',
+        pos: [x, 0.72, z],
+        rot: [-0.52, 0, 0],
+      });
+    }
+
+    // Frame, torque tube and the bearing posts it turns in.
     parts.push({ geo: box(3.36, 0.04, 1.02), mat: 'metal', pos: [0, 0.7, z], rot: [-0.52, 0, 0] });
     parts.push({ geo: cylinder(0.05, 3.3, 8), mat: 'metal', pos: [0, 0.62, z], rot: [0, 0, Math.PI / 2] });
+
     for (const x of [-1.3, 1.3]) {
       parts.push({ geo: cylinder(0.07, 0.62, 8), mat: 'metal', pos: [x, 0.31, z] });
+      // Bearing housing at the top of each post.
+      parts.push({ geo: cylinder(0.11, 0.14, 10), mat: 'dark', pos: [x, 0.62, z], rot: [0, 0, Math.PI / 2] });
+      // Foot plate, bolted down.
+      parts.push({ geo: box(0.26, 0.05, 0.26), mat: 'metal', pos: [x, 0.14, z] });
     }
+
+    // Slew actuator on the centre of the tube - the thing that does the
+    // tracking. Without it the array is a static panel pretending to track.
+    parts.push({ geo: box(0.3, 0.26, 0.34), mat: 'dark', pos: [0, 0.6, z] });
+    parts.push({ geo: cylinder(0.05, 0.32, 8), mat: 'metal', pos: [0.2, 0.5, z], rot: [0, 0, 0.7] });
+
+    // Cable drop from the row into the trench.
+    parts.push(...pipeRun([1.3, 0.55, z], [1.3, 0.16, z + 0.3], 0.035, 'dark'));
   }
 
-  // Inverter / power conditioning cabinet.
+  // Cable tray running the rows back to the inverter.
+  parts.push({ geo: box(0.16, 0.07, 2.6), mat: 'dark', pos: [1.3, 0.18, 0] });
+
+  // --- Power conditioning ------------------------------------------------
   parts.push({ geo: box(0.72, 0.85, 0.5), mat: 'hull', pos: [1.35, 0.55, 1.5] });
   parts.push({ geo: box(0.5, 0.1, 0.04), mat: 'accent', pos: [1.35, 0.82, 1.76] });
+  parts.push(...ventGrille([1.35, 0.5, 1.77], 0.5, 0.3));
+  parts.push(...boltRow([1.0, 0.96, 1.5], [1.7, 0.96, 1.5], 4, 0.018));
+
+  // The panel that tells a passing technician what the array is doing.
+  parts.push(...controlPanel([1.35, 1.12, 1.62], 0, 0.62));
 
   return parts;
 }
@@ -229,9 +277,22 @@ export function oxygenPlantParts(): Part[] {
   parts.push(...tank([-0.75, 0.18, 1.15], 0.46, 1.3, 'hull'));
   parts.push(...tank([0.5, 0.18, 1.2], 0.38, 1.05, 'hull'));
 
-  // Interconnect piping.
-  parts.push({ geo: cylinder(0.09, 1.9, 8), mat: 'metal', pos: [-0.05, 0.75, -0.6], rot: [0, 0, Math.PI / 2] });
-  parts.push({ geo: cylinder(0.08, 1.5, 8), mat: 'metal', pos: [-0.1, 0.5, 0.3], rot: [Math.PI / 2, 0, 0] });
+  // Interconnect piping, now flanged where it meets each vessel.
+  parts.push(...pipeRun([-0.95, 0.75, -0.6], [0.85, 0.75, -0.6], 0.075));
+  parts.push(...pipeRun([-0.1, 0.5, -0.35], [-0.1, 0.5, 1.05], 0.065));
+
+  // Compressor skid feeding the electrolyser: the plant needs pressure before
+  // it needs anything else.
+  parts.push({ geo: box(0.62, 0.4, 0.5), mat: 'dark', pos: [0.05, 0.38, 0.05] });
+  parts.push({ geo: cylinder(0.14, 0.44, 10), mat: 'metal', pos: [0.05, 0.68, 0.05], rot: [0, 0, Math.PI / 2] });
+
+  // Waste-heat vents on the stack, and access to the top of it.
+  parts.push(...ventGrille([1.29, 1.2, -0.55], 0.5, 0.5, Math.PI / 2));
+  parts.push(...ladder([0.75, 0.18, 0.0], 1.7, 0));
+
+  // Operator station, and a bolted inspection hatch on the intake housing.
+  parts.push(...controlPanel([-0.85, 1.05, 0.0], 0, 0.85));
+  parts.push(...boltRow([-1.55, 1.68, -0.6], [-0.15, 1.68, -0.6], 6, 0.02));
 
   parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0.75, 1.95, -0.55], scale: 0.09 });
   return parts;
@@ -260,6 +321,37 @@ export function iceExtractorParts(): Part[] {
 
   // Melt-water holding tank.
   parts.push(...tank([-1.15, 0.18, 0.95], 0.42, 1.0, 'hull'));
+
+  // --- Working detail ----------------------------------------------------
+  // Derrick cross-bracing. Four bare legs read as a tent; braced legs read as
+  // a structure meant to take the torque of a drill.
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const b = ((i + 1) / 4) * Math.PI * 2 + Math.PI / 4;
+    for (const y of [0.9, 1.8]) {
+      parts.push(
+        ...pipeRun(
+          [Math.cos(a) * 0.5, y, Math.sin(a) * 0.5],
+          [Math.cos(b) * 0.5, y, Math.sin(b) * 0.5],
+          0.028,
+        ),
+      );
+    }
+  }
+
+  // Winch head and cable running down the bore.
+  parts.push({ geo: box(0.34, 0.24, 0.3), mat: 'dark', pos: [0, 2.72, 0] });
+  parts.push({ geo: cylinder(0.012, 1.2, 5), mat: 'metal', pos: [0.14, 2.05, 0] });
+
+  // Heated line from the condenser to the holding tank - on Mars this is the
+  // part that must not freeze.
+  parts.push(...pipeRun([0.62, 0.65, 0.55], [-0.75, 0.62, 0.95], 0.06));
+  parts.push(...pipeRun([-1.15, 0.95, 0.95], [-1.15, 1.15, 0.3], 0.05));
+
+  // Access ladder up the derrick, and the driller's console at the base.
+  parts.push(...ladder([0, 0.18, 0.62], 2.3, 0));
+  parts.push(...controlPanel([1.15, 1.25, 0.05], 0, 0.8));
+  parts.push(...crates([-1.2, 0.18, -1.15], 88, 2));
 
   parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0, 2.7, 0], scale: 0.1 });
   return parts;
@@ -375,6 +467,43 @@ export function mineParts(): Part[] {
   parts.push({ geo: taperedCylinder(0.32, 0.78, 0.95, 8), mat: 'metal', pos: [1.0, 1.5, -0.75] });
   parts.push({ geo: box(1.9, 0.1, 0.42), mat: 'dark', pos: [0.35, 1.0, -0.75], rot: [0, 0, 0.3] });
 
+  // Bucket-wheel teeth: the detail that says "this digs" rather than "this is
+  // a wheel". Six buckets around the rim, angled into the cut.
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    parts.push({
+      geo: box(0.17, 0.2, 0.17),
+      mat: 'dark',
+      pos: [
+        -1.05 + Math.cos(a) * 0.32,
+        0.78 + Math.sin(a) * 0.42,
+        -0.5 + Math.cos(a) * 0.27,
+      ],
+      rot: [0, 0.72, -0.26 + a],
+    });
+  }
+
+  // Rollers carrying the conveyor belt.
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    parts.push({
+      geo: cylinder(0.055, 0.44, 6),
+      mat: 'metal',
+      pos: [-0.6 + t * 1.9, 0.72 + t * 0.56, -0.75],
+      rot: [0, 0, Math.PI / 2],
+    });
+  }
+
+  // Spoil heaps beside the pit - ore that has already come out of the ground.
+  parts.push({ geo: unitCone(), mat: 'soil', pos: [-1.35, 0.18, 1.15], scale: [0.72, 0.42, 0.72] });
+  parts.push({ geo: unitCone(), mat: 'soil', pos: [-0.75, 0.18, 1.45], scale: [0.5, 0.3, 0.5] });
+
+  // Discharge chute, operator cab and access.
+  parts.push(...pipeRun([1.0, 1.02, -0.75], [1.0, 0.42, -1.3], 0.11));
+  parts.push(...controlPanel([1.28, 1.05, 0.65], -Math.PI / 2, 0.8));
+  parts.push(...ladder([0.75, 0.18, 1.18], 1.3, 0));
+  parts.push(...ventGrille([0.28, 0.9, 0.65], 0.4, 0.4, Math.PI / 2));
+
   parts.push(...accentBand([0.75, 1.42, 0.65], 0.5));
   parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0.75, 1.5, 0.65], scale: 0.1 });
   return parts;
@@ -393,9 +522,25 @@ export function storageParts(): Part[] {
     parts.push(...tank([x, 0.18, z], radius, height, 'hull'));
   }
 
-  // Service gantry linking the tank tops.
-  parts.push({ geo: box(2.5, 0.08, 0.3), mat: 'metal', pos: [0, 1.15, -0.85] });
-  parts.push({ geo: box(0.3, 0.08, 2.4), mat: 'metal', pos: [-0.85, 1.15, 0] });
+  // Service gantry linking the tank tops, now a walkway somebody can use:
+  // decking, a rail along it, and a ladder up to it.
+  parts.push({ geo: box(2.5, 0.08, 0.42), mat: 'metal', pos: [0, 1.15, -0.85] });
+  parts.push({ geo: box(0.42, 0.08, 2.4), mat: 'metal', pos: [-0.85, 1.15, 0] });
+  parts.push(...handrail([-1.25, 1.19, -1.03], [1.25, 1.19, -1.03], 0.44));
+  parts.push(...handrail([-1.06, 1.19, -1.2], [-1.06, 1.19, 1.2], 0.44));
+  parts.push(...ladder([1.32, 0.18, -1.0], 1.0, 0));
+
+  // Manifold and header pipe: tanks that are not plumbed to anything are
+  // barrels, not storage.
+  parts.push(...pipeRun([-0.85, 0.62, -0.85], [0.85, 0.62, -0.8], 0.06));
+  parts.push(...pipeRun([-0.8, 0.62, 0.9], [0.9, 0.62, 0.9], 0.06));
+  parts.push(...pipeRun([-0.85, 0.45, -0.6], [-0.8, 0.45, 0.65], 0.06));
+
+  // Fill point with a gauge board, where a rover would couple up.
+  parts.push({ geo: box(0.42, 0.5, 0.3), mat: 'dark', pos: [1.5, 0.43, 1.55] });
+  parts.push(...controlPanel([1.5, 0.78, 1.55], 0, 0.6));
+  parts.push(...crates([0.1, 0.18, 1.5], 1207, 3));
+
   parts.push(...accentBand([-0.85, 1.05, -0.85], 0.53));
 
   return parts;
@@ -437,9 +582,25 @@ export function labParts(): Part[] {
   parts.push(...accentBand([-1.75, 1.05, -0.8], 0.87));
   parts.push(...accentBand([-1.75, 1.05, 0.8], 0.87));
 
-  // Instrument deck.
+  // Instrument deck, railed - people work up here.
   parts.push({ geo: box(1.3, 0.1, 1.3), mat: 'metal', pos: [1.5, 1.95, 0] });
+  parts.push(...deckRail(1.3, 1.3, 2.0, 0.42).map((part) => ({
+    ...part,
+    pos: [part.pos![0] + 1.5, part.pos![1], part.pos![2]] as [number, number, number],
+  })));
+  parts.push(...ladder([1.5, 0.18, 0.72], 1.85, 0));
   parts.push(...antenna([1.5, 2.0, 0], 1.4, true));
+
+  // Sample airlock and specimen cases on the pad - a laboratory that never
+  // brings anything in from outside is not doing science.
+  parts.push({ geo: box(0.5, 0.62, 0.44), mat: 'metal', pos: [1.55, 0.5, -1.5] });
+  parts.push({ geo: cylinder(0.15, 0.1, 10), mat: 'window', pos: [1.55, 0.72, -1.29], rot: [Math.PI / 2, 0, 0] });
+  parts.push(...crates([0.5, 0.18, 1.5], 5150, 3));
+
+  // Analysis console at the airlock end.
+  parts.push(...controlPanel([-1.9, 1.1, 1.1], 0.5, 0.8));
+  parts.push(...ventGrille([0.55, 1.75, -1.42], 0.5, 0.32));
+
   parts.push(...airlock([-2.35, 1.05, 0], Math.PI / 2, 1.0, 0.45));
 
   return parts;
@@ -457,6 +618,20 @@ export function medicalParts(): Part[] {
   parts.push({ geo: box(0.85, 0.05, 0.16), mat: 'hazard', pos: [0, 2.28, 0] });
 
   parts.push(...viewports(6, [-1.2, 0.95, 1.15], [0.48, 0, 0], 0.16));
+
+  // Medical air and oxygen bottles racked against the shell, plumbed inside.
+  for (let i = 0; i < 3; i++) {
+    parts.push({ geo: cylinder(0.13, 0.72, 10), mat: 'hull', pos: [-1.45 + i * 0.32, 0.54, -1.15] });
+  }
+  parts.push(...pipeRun([-1.45, 0.92, -1.15], [-0.8, 0.92, -1.4], 0.04));
+
+  // A decontamination bay outside the airlock: you do not walk Martian dust
+  // straight into a clinic.
+  parts.push({ geo: box(1.0, 0.05, 0.7), mat: 'concrete', pos: [0, 0.2, 1.95] });
+  parts.push(...handrail([-0.5, 0.22, 1.95], [0.5, 0.22, 1.95], 0.4));
+  parts.push(...controlPanel([0.78, 0.95, 1.7], -0.5, 0.7));
+  parts.push(...ventGrille([1.15, 1.05, 0.9], 0.44, 0.3, -0.8));
+
   parts.push(...airlock([0, 0.85, 1.95], 0, 1.0, 0.45));
   parts.push(...radiator([1.75, 1.0, -1.0], 1.1, 1.0, -0.9));
 
@@ -520,8 +695,24 @@ export function batteryParts(): Part[] {
     }
   }
 
+  // Service walkway between the rack rows, railed on both sides.
   parts.push({ geo: box(3.2, 0.08, 0.5), mat: 'metal', pos: [0, 0.22, 0] });
+  parts.push(...handrail([-1.6, 0.26, -0.26], [1.6, 0.26, -0.26], 0.4));
+  parts.push(...handrail([-1.6, 0.26, 0.26], [1.6, 0.26, 0.26], 0.4));
+
+  for (const z of [-0.85, 0.85]) {
+    // Busbar trunking over the racks, dropping into each cabinet.
+    parts.push({ geo: box(3.1, 0.12, 0.14), mat: 'dark', pos: [0, 1.54, z] });
+    // Cooling louvres on every cabinet face - cells that cannot shed heat die.
+    for (let i = 0; i < 3; i++) {
+      parts.push(
+        ...ventGrille([(i - 1) * 1.05, 0.62, z + (z < 0 ? -0.32 : 0.32)], 0.6, 0.34),
+      );
+    }
+  }
+
   parts.push({ geo: cylinder(0.14, 1.1, 8), mat: 'metal', pos: [1.55, 0.73, 0] });
+  parts.push(...controlPanel([-1.62, 1.0, 0], -Math.PI / 2, 0.75));
   parts.push({ geo: unitSphere(), mat: 'hazard', pos: [1.55, 1.35, 0], scale: 0.1 });
   return parts;
 }
@@ -544,6 +735,29 @@ export function commsParts(): Part[] {
   });
   // Feed horn at the dish focus.
   parts.push({ geo: unitCone(), mat: 'metal', pos: [0.95, 3.1, 0.35], rot: [-0.6, 0, 0.4], scale: [0.14, 0.4, 0.14] });
+
+  // Rim ribs on the reflector. A smooth bowl reads as moulded plastic; a
+  // ribbed one reads as something fabricated in panels and bolted together.
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    parts.push({
+      geo: box(0.05, 0.05, 1.15),
+      mat: 'metal',
+      pos: [0.6 + Math.cos(a) * 0.5, 2.72, -0.3 + Math.sin(a) * 0.5],
+      rot: [Math.PI * 0.68 + 0.35, a, 0.45],
+    });
+  }
+
+  // Elevation drive and counterweight on the mount.
+  parts.push({ geo: box(0.3, 0.3, 0.42), mat: 'dark', pos: [0.22, 2.15, -0.3] });
+  parts.push({ geo: cylinder(0.16, 0.28, 10), mat: 'metal', pos: [0.6, 1.95, -0.72], rot: [Math.PI / 2, 0, 0] });
+
+  // Waveguide from the shelter to the feed, plus the shelter hardware.
+  parts.push(...pipeRun([-0.9, 1.2, 0.7], [0.52, 1.9, -0.2], 0.05));
+  parts.push(...ventGrille([-0.9, 0.75, 1.31], 0.6, 0.36));
+  parts.push(...controlPanel([-0.15, 0.95, 0.7], Math.PI / 2, 0.7));
+  parts.push(...boltRow([-1.6, 1.21, 0.7], [-0.2, 1.21, 0.7], 5, 0.018));
+  parts.push(...crates([-1.45, 0.18, 1.5], 606, 2));
 
   parts.push(...antenna([-1.5, 0.2, -1.3], 2.6, false));
   return parts;
@@ -592,6 +806,31 @@ export function fuelPlantParts(): Part[] {
   parts.push({ geo: box(1.1, 0.9, 2.4), mat: 'hull', pos: [2.2, 0.65, 0] });
   parts.push({ geo: cylinder(0.11, 2.2, 8), mat: 'metal', pos: [-0.3, 1.9, 0], rot: [0, 0, Math.PI / 2] });
   parts.push({ geo: cylinder(0.09, 1.8, 8), mat: 'metal', pos: [0.85, 0.55, 0], rot: [Math.PI / 2, 0, 0] });
+
+  // Insulation banding up the reactor vessel, and a way onto the top of it.
+  for (let i = 0; i < 4; i++) {
+    parts.push({
+      geo: torus(0.72, 0.045, 18),
+      mat: 'metal',
+      pos: [-1.4, 0.55 + i * 0.55, 0],
+      rot: [Math.PI / 2, 0, 0],
+    });
+  }
+  parts.push(...ladder([-1.4, 0.18, 0.74], 2.5, 0));
+  parts.push({ geo: box(1.0, 0.07, 1.0), mat: 'metal', pos: [-1.4, 2.72, 0] });
+
+  // Relief valves and frost collars on the cryogenic tanks: methane is stored
+  // cold, and every piece of hardware on the outside should say so.
+  for (const z of [-0.85, 0.9]) {
+    parts.push({ geo: cylinder(0.07, 0.3, 8), mat: 'metal', pos: [0.85, 2.0, z] });
+    parts.push({ geo: torus(0.62, 0.05, 16), mat: 'hull', pos: [0.85, 1.5, z], rot: [Math.PI / 2, 0, 0] });
+  }
+
+  // Process plumbing between vessel, condenser and tanks.
+  parts.push(...pipeRun([-0.7, 1.9, 0], [0.85, 1.9, -0.85], 0.075));
+  parts.push(...pipeRun([-0.7, 1.6, 0], [0.85, 1.6, 0.9], 0.075));
+  parts.push(...ventGrille([2.2, 0.95, 1.21], 0.7, 0.4));
+  parts.push(...controlPanel([1.6, 1.15, 1.3], 0.4, 0.85));
 
   parts.push(...radiator([-2.6, 1.2, 0], 1.3, 1.2, Math.PI / 2));
   parts.push({ geo: unitSphere(), mat: 'hazard', pos: [-1.4, 2.85, 0], scale: 0.11 });

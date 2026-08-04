@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 
-import type { BuildingId } from '../buildings/catalog';
+import { BUILDING_IDS, getBuildingModel, type BuildingId } from '../buildings/catalog';
 import { IMPORTED_MODELS, getImportedModel } from '../buildings/importedModels';
 import { SOL_DURATION_SECONDS } from '../core/constants';
 import { useColonyStore } from '../state/useColonyStore';
@@ -62,6 +62,36 @@ export function TimeController() {
       setTimeOfDay(fraction: number) {
         worldClock.sols = Math.floor(worldClock.sols) + fraction;
       },
+      /**
+       * Triangle cost of every structure's model.
+       *
+       * The detail kit adds hardware freely because it merges into existing
+       * geometry and costs no draw calls - but it does cost triangles, and
+       * "costs no draw calls" is not the same as "is free". This is how that
+       * claim gets checked rather than assumed.
+       */
+      tris() {
+        const rows = BUILDING_IDS.map((id) => {
+          const model = getBuildingModel(id);
+          let triangles = 0;
+          for (const geometry of Object.values(model)) {
+            if (!geometry) continue;
+            const index = geometry.getIndex();
+            const position = geometry.getAttribute('position');
+            triangles += (index ? index.count : (position?.count ?? 0)) / 3;
+          }
+          return { building: id, triangles: Math.round(triangles), materials: Object.keys(model).length };
+        }).sort((a, b) => b.triangles - a.triangles);
+
+        // eslint-disable-next-line no-console
+        console.table(rows);
+        return {
+          total: rows.reduce((sum, r) => sum + r.triangles, 0),
+          structures: rows.length,
+          heaviest: rows.slice(0, 8),
+        };
+      },
+
       /** Which structures ended up on a downloaded model rather than a built one. */
       models() {
         const rows = (Object.keys(IMPORTED_MODELS) as BuildingId[]).map((id) => {
