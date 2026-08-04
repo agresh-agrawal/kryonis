@@ -19,6 +19,7 @@ import {
   type CrewSkill,
   useCrewStore,
 } from '../state/useCrewStore';
+import { assignPostings, jobTitle, payrollOf, wageOf, type Posting } from '../state/crewIdentity';
 import { Console, ConsoleSection, Readout } from './Console';
 import { ColonistsIcon, CreditsIcon, ResearchIcon } from './icons';
 
@@ -81,6 +82,17 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
     [assignedResearcherId, roster],
   );
 
+  /*
+   * Where everybody actually works.
+   *
+   * Computed for the whole roster in one pass rather than per card, so the
+   * assignment is consistent - two cards cannot both claim the last seat at the
+   * mine - and stable, so the list does not reshuffle while it is being read.
+   */
+  const buildings = useColonyStore((state) => state.buildings);
+  const postings = useMemo(() => assignPostings(roster, buildings), [roster, buildings]);
+  const payroll = useMemo(() => payrollOf(roster), [roster]);
+
   const attemptHire = () => {
     if (!canHire) return;
     if (!spend({ money: cost })) return;
@@ -114,10 +126,10 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
               note={vacancies === 0 ? 'Build to expand' : undefined}
             />
             <Readout
-              label="Research lead"
-              value={assigned ? assigned.name.split(' ')[0] : 'None'}
-              tone={assigned ? 'accent' : 'warn'}
-              note={assigned ? assigned.skill : 'Research is slow'}
+              label="Wages"
+              value={`${formatAmount(payroll)}/sol`}
+              tone={payroll > 0 ? 'warn' : 'normal'}
+              note="Paid continuously"
             />
           </div>
 
@@ -131,6 +143,7 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
                 <CrewCard
                   key={member.id}
                   member={member}
+                  posting={postings.get(member.id)}
                   lead={member.id === assignedResearcherId}
                   onToggleLead={() =>
                     assignResearcher(member.id === assignedResearcherId ? null : member.id)
@@ -228,12 +241,17 @@ export function CrewConsole({ onClose }: { onClose: () => void }) {
 function CrewCard({
   member,
   lead,
+  posting,
   onToggleLead,
 }: {
   member: CrewMember;
   lead: boolean;
+  posting: Posting | undefined;
   onToggleLead: () => void;
 }) {
+  const title = jobTitle(member);
+  const wage = wageOf(member);
+  const idle = !posting || posting.buildingId === null;
   return (
     <button
       type="button"
@@ -247,8 +265,9 @@ function CrewCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <span className="t-md block truncate text-bone">{member.name}</span>
-          <span className={`t-sm mt-1 block ${roleBadge(member)}`}>{member.skill}</span>
-          <span className="t-micro mt-1 block text-faint">{member.role}</span>
+          {/* The job title, not the skill enum. "Chief Engineer" is a person;
+              "Engineering, rank 3" is a stat block. */}
+          <span className={`t-sm mt-1 block truncate ${roleBadge(member)}`}>{title}</span>
         </div>
         <span className={lead ? 'text-dust' : 'text-titanium'}>
           <ColonistsIcon className="h-5 w-5" />
@@ -279,13 +298,18 @@ function CrewCard({
         )}
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="t-micro text-faint">Salary</span>
-        <span className="t-num text-[0.72rem] text-bone">{formatAmount(780 + member.rank * 140)}</span>
+      <span className="rule-x my-3 block" />
+
+      {/* Posted where, and paid what. The two facts that make a name a person. */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="t-micro">Posted</span>
+        <span className={`t-sm truncate ${idle ? 'text-warn' : 'text-ash'}`}>
+          {posting?.label ?? 'Off duty'}
+        </span>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="t-micro text-faint">Focus</span>
-        <span className="t-num text-[0.58rem] text-ash">{member.role}</span>
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <span className="t-micro">Wage</span>
+        <span className="t-num text-[0.7rem] text-bone">{formatAmount(wage)}/sol</span>
       </div>
     </button>
   );

@@ -12,10 +12,11 @@ import { ColonistsIcon, PowerIcon, RESOURCE_ICONS } from './icons';
  * permitted to sit across the top of the world, so it earns its place by being
  * thin enough to ignore and legible enough to never need opening.
  *
- * Rates sit under each figure at a third of its size. The eye lands on the
- * amount first and only picks up the trend if it is looking for it - which is
- * the correct priority, since the amount is what you check and the trend is
- * what you diagnose.
+ * The one rule that governs every readout here: **a number on screen must be a
+ * number the player can name.** An earlier version printed the amount and the
+ * rate side by side as bare digits - "Oxygen 299 259" - which reads as two
+ * unrelated quantities and told nobody anything. It is now the amount, and then
+ * a direction: an arrow, a colour, and the change per sol.
  */
 const STRIP: ResourceId[] = ['money', 'oxygen', 'water', 'food', 'research'];
 
@@ -85,6 +86,15 @@ function Cell({
   );
 }
 
+/** A small solid triangle. Direction is read before any digit is. */
+function Trend({ up, className }: { up: boolean; className: string }) {
+  return (
+    <svg viewBox="0 0 8 8" className={`h-2 w-2 shrink-0 fill-current ${className}`} aria-hidden>
+      {up ? <path d="M4 1l3.2 5.4H0.8z" /> : <path d="M4 7L0.8 1.6h6.4z" />}
+    </svg>
+  );
+}
+
 function Readout({
   id,
   amount,
@@ -102,59 +112,93 @@ function Readout({
   const Icon = RESOURCE_ICONS[id];
 
   const bounded = Number.isFinite(capacity) && capacity > 0;
-  const low = bounded && amount / capacity < 0.15;
-  const critical = bounded && amount / capacity < 0.08;
+  const share = bounded ? amount / capacity : 1;
 
   /*
-   * Credits are reported per sol; everything else per hour.
+   * Everything is quoted per sol.
    *
-   * A trickle of a fraction of a credit per second is true and useless - it
-   * rounds to nothing on screen, which is exactly why the strip used to look
-   * like credits never moved at all. Per sol is the unit the player already
-   * thinks in, because it is the unit directives and wages are quoted in.
+   * A fraction of a unit per second is true and useless: it rounds to nothing
+   * on screen, which is why credits looked frozen even while the colony was
+   * earning. A sol is the unit the player already thinks in, because it is the
+   * unit directives, wages and the clock are all quoted in.
    */
-  const perSol = id === 'money';
-  const scaled = rate * (perSol ? SOL_DURATION_SECONDS : 3600);
-  const moving = Math.abs(scaled) >= 0.5;
-  const trend = scaled > 0 ? 'up' : scaled < 0 ? 'down' : 'steady';
-  const trendSymbol = trend === 'up' ? '↗' : trend === 'down' ? '↘' : '•';
-  const trendTone =
-    trend === 'up' ? 'text-good' : trend === 'down' ? (critical ? 'text-alert' : 'text-warn') : 'text-faint';
+  const perSol = rate * SOL_DURATION_SECONDS;
+  const falling = perSol < -0.5;
+  const rising = perSol > 0.5;
+
+  /*
+   * When to shout.
+   *
+   * Red is reserved for a real problem, not for any downward movement - a store
+   * that is draining while three sols of buffer remain is normal operation, and
+   * colouring it red every time teaches the player to ignore red.
+   *
+   * So: red when the store is genuinely low, amber when it is falling and
+   * getting there, and quiet otherwise. Unbounded resources (credits, research)
+   * have no ceiling to be low against, so for those "falling" is the signal.
+   */
+  const critical = bounded ? share < 0.12 : amount <= 0;
+  const warning = !critical && falling && (bounded ? share < 0.35 : amount < 2000);
+
+  const valueTone = critical ? 'text-alert' : warning ? 'text-warn' : 'text-bone';
+  const trendTone = critical ? 'text-alert' : falling ? 'text-warn' : 'text-good';
 
   return (
     <div
-      className="group relative flex min-w-[4.6rem] flex-col justify-center px-2.5 py-1.5 min-[1180px]:px-4 min-[1180px]:py-2"
-      title={def.label}
+      className="group relative flex min-w-[5.2rem] flex-col justify-center px-2.5 py-1.5 min-[1180px]:px-4 min-[1180px]:py-2"
+      title={
+        rising || falling
+          ? `${def.label}: ${Math.round(amount)}${bounded ? ` of ${Math.round(capacity)}` : ''}, ${
+              rising ? 'gaining' : 'losing'
+            } ${Math.abs(Math.round(perSol))} per sol`
+          : `${def.label}: ${Math.round(amount)}${bounded ? ` of ${Math.round(capacity)}` : ''}, steady`
+      }
     >
       {divided ? <span className="rule-y absolute inset-y-2 left-0" /> : null}
 
-      <span className="t-micro">{def.short}</span>
+      <span className={`t-micro ${critical ? 'text-alert' : ''}`}>{def.short}</span>
 
-      <span className="mt-1.5 flex items-baseline gap-1.5">
+      <span className="mt-1.5 flex items-center gap-1.5">
         {Icon ? (
           <Icon
-            className={`h-3 w-3 shrink-0 self-center transition-colors ${
-              critical ? 'text-alert' : low ? 'text-warn' : 'text-titanium group-hover:text-steel'
+            className={`h-3 w-3 shrink-0 transition-colors ${
+              critical ? 'text-alert' : 'text-titanium group-hover:text-steel'
             }`}
           />
         ) : null}
-        <span className={`t-num text-[0.98rem] ${critical ? 'text-alert' : low ? 'text-warn' : 'text-bone'}`}>
-          {formatAmount(amount)}
-        </span>
-        {moving ? (
-          <span
-            className={`t-num flex items-center gap-1 text-[0.58rem] ${trendTone}`}
-            title={perSol ? 'Credits per sol' : 'Per hour'}
-          >
-            <span>{trendSymbol}</span>
-            <span>
-              {scaled > 0 ? '+' : ''}
-              {formatAmount(scaled)}
-              {perSol ? <span className="text-faint">/sol</span> : null}
+
+        <span className={`t-num text-[0.98rem] ${valueTone}`}>{formatAmount(amount)}</span>
+
+        {/*
+          The arrow, not a second number.
+          Direction is the thing being communicated; the magnitude is secondary
+          and sits at two-thirds the size behind it.
+        */}
+        {rising || falling ? (
+          <span className="flex items-center gap-0.5">
+            <Trend up={rising} className={trendTone} />
+            <span className={`t-num text-[0.56rem] ${trendTone}`}>
+              {formatAmount(Math.abs(perSol))}
             </span>
           </span>
         ) : null}
       </span>
+
+      {/*
+        A hairline fill for anything with a ceiling.
+        Turns "260 food" into "260 food and about a third of a tank", which is
+        the question actually being asked.
+      */}
+      {bounded ? (
+        <span className="mt-1.5 block h-px w-full bg-white/10">
+          <span
+            className={`block h-px transition-[width] duration-700 ${
+              critical ? 'bg-alert' : warning ? 'bg-warn' : 'bg-dust/70'
+            }`}
+            style={{ width: `${Math.max(2, Math.min(1, share) * 100)}%` }}
+          />
+        </span>
+      ) : null}
     </div>
   );
 }

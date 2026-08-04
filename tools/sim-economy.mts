@@ -18,7 +18,9 @@ import { SOL_DURATION_SECONDS } from '../src/game/core/constants';
 import { startingStock, type ResourceId } from '../src/game/core/resources';
 import { NO_MODIFIERS, emptyStats, stepColony } from '../src/game/sim/simulation';
 import { hiringCost } from '../src/game/state/useCrewStore';
+import { wageOf } from '../src/game/state/crewIdentity';
 import type { PlacedBuilding } from '../src/game/state/useColonyStore';
+import { setRoad, solveNetworks } from '../src/game/world/roads';
 
 /** A plausible opening build, in the order a player would actually put it up. */
 const BUILD_ORDER: BuildingId[] = [
@@ -39,13 +41,36 @@ const BUILD_ORDER: BuildingId[] = [
   'factory',
 ];
 
+/*
+ * Layout: a road spine with the structures lined up along it.
+ *
+ * Structures only run when they are touching a serviced road, so a simulation
+ * that places them in an empty field is testing a colony that cannot work. The
+ * first run after roads landed showed exactly that - nothing produced, and the
+ * crew suffocated by sol four.
+ *
+ * Each building is positioned so its far edge lands on the row immediately
+ * above the road, which is what puts a road tile in its adjacency ring
+ * regardless of how deep its footprint is.
+ */
+const ROAD_TZ = 46;
+let nextX = 30;
+
 let nextId = 1;
 function place(type: BuildingId): PlacedBuilding {
+  const [w, d] = BUILDINGS[type].footprint;
+  const tx = nextX;
+  nextX += w + 1;
+
+  // Road under the whole frontage, plus one tile of overlap either side so the
+  // spine stays one continuous network.
+  for (let i = -1; i <= w; i++) setRoad(tx + i, ROAD_TZ, true);
+
   return {
     id: `b${nextId++}`,
     type,
-    tx: 40 + nextId,
-    tz: 40,
+    tx,
+    tz: ROAD_TZ - d,
     rotation: 0,
     progress: 1,
     enabled: true,
@@ -70,6 +95,7 @@ const spend = (type: BuildingId): boolean => {
     dynamics.stock[resource] -= amount;
   }
   buildings.push(place(type));
+  solveNetworks(buildings);
   return true;
 };
 
@@ -99,7 +125,7 @@ const ticksPerSol = SOL_DURATION_SECONDS / DT;
 
 console.log('\nOpening build, one structure every third of a sol:\n');
 console.log(
-  '  sol   credits  income/sol   pop  staff  power   limited by',
+  '  sol   credits  income/sol   pop  staff  power    O2  H2O  food   alert',
 );
 console.log('  ' + '-'.repeat(72));
 
@@ -122,7 +148,11 @@ for (let sol = 0; sol < SOLS; sol++) {
     const dayFraction = tick / ticksPerSol;
     const solar = Math.max(0, Math.sin(dayFraction * Math.PI * 2 - Math.PI / 2) * 0.5 + 0.5);
 
-    const result = stepColony(DT, dynamics, buildings, solar, NO_MODIFIERS);
+    const result = stepColony(DT, dynamics, buildings, solar, {
+      ...NO_MODIFIERS,
+      // Every colonist on the books draws a wage, exactly as in the game.
+      payrollPerSol: roster * wageOf({ rank: 1, skill: 'Operations' } as never),
+    });
     dynamics = {
       stock: result.stock,
       population: result.population,
@@ -158,7 +188,11 @@ for (let sol = 0; sol < SOLS; sol++) {
       `${String(Math.round((solSamples.income / solSamples.n) * SOL_DURATION_SECONDS)).padStart(10)}   ` +
       `${String(Math.round(dynamics.population)).padStart(3)}  ` +
       `${String(Math.round((solSamples.staffing / solSamples.n) * 100)).padStart(4)}% ` +
-      `${String(Math.round((solSamples.power / solSamples.n) * 100)).padStart(5)}%   ${limits.join(' + ')}`,
+      `${String(Math.round((solSamples.power / solSamples.n) * 100)).padStart(5)}%  ` +
+      `${String(Math.round(dynamics.stock.oxygen)).padStart(4)} ` +
+      `${String(Math.round(dynamics.stock.water)).padStart(4)} ` +
+      `${String(Math.round(dynamics.stock.food)).padStart(5)}   ` +
+      `${stats.alerts.filter((a) => a.severity !== 'info').map((a) => a.id).slice(0, 2).join(',') || limits.join('+')}`,
   );
 
   solSamples = { n: 0, income: 0, staffing: 0, power: 0 };

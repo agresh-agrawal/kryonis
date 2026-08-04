@@ -111,6 +111,13 @@ export interface SimModifiers {
    * Below 1 is a saving. Set from mission doctrine, not from research.
    */
   lifeSupportDraw: number;
+  /**
+   * Total crew wages per sol, in credits.
+   *
+   * The colony's only recurring cost. Without it credits only ever rise once
+   * exports are running, and hiring has no consequence past the joining fee.
+   */
+  payrollPerSol: number;
 }
 
 export const NO_MODIFIERS: SimModifiers = {
@@ -123,6 +130,7 @@ export const NO_MODIFIERS: SimModifiers = {
   storage: 1,
   morale: 0,
   lifeSupportDraw: 1,
+  payrollPerSol: 0,
 };
 
 /** Which modifier applies to a given produced resource. */
@@ -328,11 +336,25 @@ export function stepColony(
   // ---- Production -------------------------------------------------------
   const capacity = computeCapacity(buildings, mods.storage);
   const efficiency = Math.max(0, Math.min(1, staffing * powerSatisfaction));
-  const utilityConnected = buildings.some((entry) => entry.type === 'road' && entry.progress >= 1 && entry.enabled);
 
   for (const building of active) {
     const def = BUILDINGS[building.type];
-    if (efficiency <= 0 || !utilityConnected) break;
+    /*
+     * Only the two global multipliers gate production here.
+     *
+     * There used to be a third condition on this line: a `utilityConnected`
+     * flag testing whether any building had `type === 'road'`. No such building
+     * type has ever existed in the catalog, so the flag was permanently false
+     * and this `break` fired on the very first structure - meaning *nothing in
+     * the colony ever produced anything*, in any save, silently. A colony with
+     * full sun, full power and full staffing still watched its oxygen drain to
+     * zero.
+     *
+     * Road service is a per-structure question and is answered in the census
+     * above, where an unserviced building never reaches `active` in the first
+     * place. It has no business being a global break.
+     */
+    if (efficiency <= 0) break;
 
     // An upgraded plant processes more of everything, inputs included.
     const scale = upgradeTier(building.level).output;
@@ -407,6 +429,17 @@ export function stepColony(
     stock[resource] = 0;
     return false;
   };
+
+  /*
+   * Payroll.
+   *
+   * Paid continuously rather than in a lump at each sol boundary, so the credit
+   * readout moves smoothly and a player can see the drain against their export
+   * income instead of being surprised once a day.
+   */
+  if (mods.payrollPerSol > 0) {
+    stock.money = Math.max(0, stock.money - (mods.payrollPerSol / 1440) * dt);
+  }
 
   const hasOxygen = consume('oxygen');
   const hasWater = consume('water');

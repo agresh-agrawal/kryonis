@@ -8,6 +8,7 @@ import type { ResourceId } from '../core/resources';
 import type { MissionContext } from '../progress/missions';
 import { useColonyStore } from '../state/useColonyStore';
 import { useRoadStore } from '../state/useRoadStore';
+import { payrollOf } from '../state/crewIdentity';
 import { useCrewStore } from '../state/useCrewStore';
 import { currentDoctrine } from '../state/useProfileStore';
 import { useProgressStore } from '../state/useProgressStore';
@@ -73,6 +74,7 @@ export function SimulationController() {
       storage: research.storage,
       morale: research.morale + event.morale,
       lifeSupportDraw: currentDoctrine().lifeSupportScale,
+      payrollPerSol: payrollOf(useCrewStore.getState().roster),
     };
 
     let ticks = 0;
