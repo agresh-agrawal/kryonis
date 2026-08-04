@@ -37,6 +37,15 @@ export const OUTER_TERRAIN_RADIUS = 1400;
  * a circular valley wants concentric growth.
  */
 export const START_UNLOCK_RADIUS = 44;
+
+/**
+ * Cost of one road tile.
+ *
+ * Deliberately small. Roads are the thing that makes every other structure
+ * work, so pricing them like a building would turn the colony's circulatory
+ * system into a luxury and leave players with a crater full of dead hardware.
+ */
+export const ROAD_COST = 45;
 export const UNLOCK_STEP = 10;
 
 /** Slope above which terrain is considered cliff and cannot be built on. */

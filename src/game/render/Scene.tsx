@@ -15,8 +15,10 @@ import { useWorldStore } from '../state/useWorldStore';
 import { Boulders } from '../world/Boulders';
 import { DustMotes } from '../world/DustMotes';
 import { MarsSky } from '../world/MarsSky';
+import { RoadLayer } from '../world/RoadLayer';
 import { TerrainMesh } from '../world/TerrainMesh';
 import { CameraRig } from './CameraRig';
+import { LandingSequence } from './LandingSequence';
 import { Lighting } from './Lighting';
 import { PostFX } from './PostFX';
 import { SimulationController } from './SimulationController';
@@ -53,12 +55,16 @@ export function Scene() {
       <Lighting quality={quality} />
 
       <TerrainMesh terrain={terrain} quality={quality} />
+      {/* Roads sit under everything the colony builds on top of them. */}
+      <RoadLayer terrain={terrain} />
+
       <Boulders terrain={terrain} quality={quality} />
 
       {/* Bakes the build-deck previews once, using this same renderer. */}
       <ThumbnailBaker />
 
       <BuildingsLayer terrain={terrain} quality={quality} />
+      <LandingSequence terrain={terrain} />
       <ColonistsLayer terrain={terrain} quality={quality} />
       <BuildGrid terrain={terrain} active={tool !== 'select'} />
       <PlacementController terrain={terrain} />

@@ -117,6 +117,74 @@ function reindexOccupancy(buildings: PlacedBuilding[]): void {
   buildings.forEach((building, index) => stampFootprint(building, index + 1));
 }
 
+function tileKey(tx: number, tz: number): string {
+  return `${tx},${tz}`;
+}
+
+function footprintTiles(building: Pick<PlacedBuilding, 'type' | 'tx' | 'tz' | 'rotation'>): [number, number][] {
+  const [w, d] = rotatedFootprint(building.type, building.rotation);
+  const tiles: [number, number][] = [];
+  for (let dz = 0; dz < d; dz++) {
+    for (let dx = 0; dx < w; dx++) {
+      tiles.push([building.tx + dx, building.tz + dz]);
+    }
+  }
+  return tiles;
+}
+
+function refreshBuildingConnectivity(buildings: PlacedBuilding[]): PlacedBuilding[] {
+  const roadTiles = new Set<string>();
+  const landerTiles = new Set<string>();
+
+  for (const building of buildings) {
+    if (building.progress < 1) continue;
+    if (building.type === 'road') {
+      for (const [tx, tz] of footprintTiles(building)) roadTiles.add(tileKey(tx, tz));
+    }
+    if (building.type === 'lander') {
+      for (const [tx, tz] of footprintTiles(building)) landerTiles.add(tileKey(tx, tz));
+    }
+  }
+
+  const connected = new Set<string>();
+  const queue = Array.from(landerTiles);
+  while (queue.length) {
+    const current = queue.pop();
+    if (!current || connected.has(current)) continue;
+    connected.add(current);
+
+    const [x, z] = current.split(',').map(Number);
+    for (const [nx, nz] of [
+      [x + 1, z],
+      [x - 1, z],
+      [x, z + 1],
+      [x, z - 1],
+    ]) {
+      const key = tileKey(nx, nz);
+      if ((roadTiles.has(key) || landerTiles.has(key)) && !connected.has(key)) queue.push(key);
+    }
+  }
+
+  return buildings.map((building) => {
+    if (building.type === 'lander') return { ...building, enabled: true };
+    if (building.progress < 1) return building;
+
+    const tiles = footprintTiles(building);
+    const connectedToInfrastructure = tiles.some(([tx, tz]) => {
+      const key = tileKey(tx, tz);
+      if (connected.has(key)) return true;
+      return [
+        [tx + 1, tz],
+        [tx - 1, tz],
+        [tx, tz + 1],
+        [tx, tz - 1],
+      ].some(([nx, nz]) => connected.has(tileKey(nx, nz)));
+    });
+
+    return { ...building, enabled: building.enabled && connectedToInfrastructure };
+  });
+}
+
 /** World-space centre and rotation of a placed building. */
 export function buildingTransform(
   terrain: TerrainData,
@@ -287,8 +355,10 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
         return Number.isFinite(numeric) ? Math.max(highest, numeric) : highest;
       }, 0) + 1;
 
+    const buildings = refreshBuildingConnectivity(snapshot.buildings);
+
     set({
-      buildings: snapshot.buildings,
+      buildings,
       stock: snapshot.stock,
       unlockedRadius: snapshot.unlockedRadius,
       population: snapshot.population,
@@ -358,7 +428,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
       level: 1,
     };
 
-    const buildings = [lander];
+    const buildings = refreshBuildingConnectivity([lander]);
     reindexOccupancy(buildings);
 
     // Doctrine is applied here rather than at the opening screen, so that a
@@ -376,7 +446,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
     }
 
     set({
-      buildings,
+      buildings: refreshBuildingConnectivity(buildings),
       stock,
       unlockedRadius: START_UNLOCK_RADIUS,
       selectedId: null,
@@ -515,7 +585,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
     if (building.progress < 1) constructionProgress.set(building.id, 0);
 
     set((state) => {
-      const buildings = [...state.buildings, building];
+      const buildings = refreshBuildingConnectivity([...state.buildings, building]);
       stampFootprint(building, buildings.length);
 
       const stock = { ...state.stock };
@@ -535,7 +605,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
       const buildings = state.buildings.filter((building) => building.id !== id);
       reindexOccupancy(buildings);
       return {
-        buildings,
+        buildings: refreshBuildingConnectivity(buildings),
         selectedId: state.selectedId === id ? null : state.selectedId,
       };
     });
@@ -562,10 +632,12 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
 
     set({
       stock,
-      buildings: state.buildings.map((entry) =>
-        entry.id === id
-          ? { ...entry, level: entry.level + 1, progress: tier.buildTime > 0 ? 0 : 1 }
-          : entry,
+      buildings: refreshBuildingConnectivity(
+        state.buildings.map((entry) =>
+          entry.id === id
+            ? { ...entry, level: entry.level + 1, progress: tier.buildTime > 0 ? 0 : 1 }
+            : entry,
+        ),
       ),
     });
 
@@ -575,8 +647,8 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
   completeConstruction: (id) => {
     constructionProgress.delete(id);
     set((state) => ({
-      buildings: state.buildings.map((building) =>
-        building.id === id ? { ...building, progress: 1 } : building,
+      buildings: refreshBuildingConnectivity(
+        state.buildings.map((building) => (building.id === id ? { ...building, progress: 1 } : building)),
       ),
     }));
   },

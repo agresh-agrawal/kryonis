@@ -103,6 +103,7 @@ function Readout({
 
   const bounded = Number.isFinite(capacity) && capacity > 0;
   const low = bounded && amount / capacity < 0.15;
+  const critical = bounded && amount / capacity < 0.08;
 
   /*
    * Credits are reported per sol; everything else per hour.
@@ -115,6 +116,10 @@ function Readout({
   const perSol = id === 'money';
   const scaled = rate * (perSol ? SOL_DURATION_SECONDS : 3600);
   const moving = Math.abs(scaled) >= 0.5;
+  const trend = scaled > 0 ? 'up' : scaled < 0 ? 'down' : 'steady';
+  const trendSymbol = trend === 'up' ? '↗' : trend === 'down' ? '↘' : '•';
+  const trendTone =
+    trend === 'up' ? 'text-good' : trend === 'down' ? (critical ? 'text-alert' : 'text-warn') : 'text-faint';
 
   return (
     <div
@@ -129,21 +134,24 @@ function Readout({
         {Icon ? (
           <Icon
             className={`h-3 w-3 shrink-0 self-center transition-colors ${
-              low ? 'text-alert' : 'text-titanium group-hover:text-steel'
+              critical ? 'text-alert' : low ? 'text-warn' : 'text-titanium group-hover:text-steel'
             }`}
           />
         ) : null}
-        <span className={`t-num text-[0.98rem] ${low ? 'text-alert' : 'text-bone'}`}>
+        <span className={`t-num text-[0.98rem] ${critical ? 'text-alert' : low ? 'text-warn' : 'text-bone'}`}>
           {formatAmount(amount)}
         </span>
         {moving ? (
           <span
-            className={`t-num text-[0.58rem] ${scaled > 0 ? 'text-good' : 'text-alert'}`}
+            className={`t-num flex items-center gap-1 text-[0.58rem] ${trendTone}`}
             title={perSol ? 'Credits per sol' : 'Per hour'}
           >
-            {scaled > 0 ? '+' : ''}
-            {formatAmount(scaled)}
-            {perSol ? <span className="text-faint">/sol</span> : null}
+            <span>{trendSymbol}</span>
+            <span>
+              {scaled > 0 ? '+' : ''}
+              {formatAmount(scaled)}
+              {perSol ? <span className="text-faint">/sol</span> : null}
+            </span>
           </span>
         ) : null}
       </span>

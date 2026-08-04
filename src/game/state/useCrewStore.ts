@@ -12,6 +12,7 @@ export interface CrewMember {
   skill: CrewSkill;
   rank: number;
   hiredAtSol: number;
+  role: string;
 }
 
 export interface CrewSnapshot {
@@ -20,10 +21,10 @@ export interface CrewSnapshot {
 }
 
 const STARTING_CREW: CrewMember[] = [
-  { id: 'c1', name: 'Mira Vale', skill: 'Engineering', rank: 2, hiredAtSol: 1 },
-  { id: 'c2', name: 'Jonas Okafor', skill: 'Biology', rank: 2, hiredAtSol: 1 },
-  { id: 'c3', name: 'Ilya Chen', skill: 'Geology', rank: 1, hiredAtSol: 1 },
-  { id: 'c4', name: 'Nadia Solheim', skill: 'Operations', rank: 1, hiredAtSol: 1 },
+  { id: 'c1', name: 'Mira Vale', skill: 'Engineering', rank: 2, hiredAtSol: 1, role: 'Power Lead' },
+  { id: 'c2', name: 'Jonas Okafor', skill: 'Biology', rank: 2, hiredAtSol: 1, role: 'Life Support Lead' },
+  { id: 'c3', name: 'Ilya Chen', skill: 'Geology', rank: 1, hiredAtSol: 1, role: 'Mining Lead' },
+  { id: 'c4', name: 'Nadia Solheim', skill: 'Operations', rank: 1, hiredAtSol: 1, role: 'Colony Ops' },
 ];
 
 const NAME_POOL: Record<CrewSkill, string[]> = {
@@ -78,6 +79,7 @@ export const useCrewStore = create<CrewState>((set, get) => ({
       skill,
       rank: 1 + (get().roster.length % 3 === 0 ? 1 : 0),
       hiredAtSol: Math.floor(sol) + 1,
+      role: `${skill} Specialist`,
     };
     set((state) => ({ roster: [...state.roster, member] }));
     return member;

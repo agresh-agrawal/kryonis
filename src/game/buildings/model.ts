@@ -125,6 +125,13 @@ export function dome(radius: number, segments = 24): THREE.BufferGeometry {
   return new THREE.SphereGeometry(radius, segments, Math.max(6, segments / 2), 0, Math.PI * 2, 0, Math.PI / 2);
 }
 
+/** A more sculpted habitat dome with a lifted crown and flatter base. */
+export function pressureDome(radius: number, segments = 24): THREE.BufferGeometry {
+  const geo = new THREE.SphereGeometry(radius, segments, Math.max(10, Math.round(segments * 0.7)), 0, Math.PI * 2, 0, Math.PI / 2);
+  geo.scale(1, 0.92, 1);
+  return geo;
+}
+
 /** Horizontal pressurised module: a cylinder with domed end caps. */
 export function capsule(radius: number, length: number, segments = 18): THREE.BufferGeometry {
   const geo = new THREE.CapsuleGeometry(radius, length, 6, segments);

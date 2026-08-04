@@ -22,6 +22,18 @@ import {
 import { Console, ConsoleSection, Readout } from './Console';
 import { ColonistsIcon, CreditsIcon, ResearchIcon } from './icons';
 
+function roleBadge(member: CrewMember) {
+  const palette = {
+    Engineering: 'text-dust',
+    Biology: 'text-good',
+    Geology: 'text-titanium',
+    Operations: 'text-bone',
+    Medicine: 'text-warn',
+  } as const;
+
+  return palette[member.skill];
+}
+
 /** What each speciality is actually for, in the player's terms. */
 const SKILL_BRIEF: Record<CrewSkill, string> = {
   Engineering: 'Keeps the power on. Best at Energy research.',
@@ -235,7 +247,8 @@ function CrewCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <span className="t-md block truncate text-bone">{member.name}</span>
-          <span className="t-sm mt-1 block text-ash">{member.skill}</span>
+          <span className={`t-sm mt-1 block ${roleBadge(member)}`}>{member.skill}</span>
+          <span className="t-micro mt-1 block text-faint">{member.role}</span>
         </div>
         <span className={lead ? 'text-dust' : 'text-titanium'}>
           <ColonistsIcon className="h-5 w-5" />
@@ -264,6 +277,15 @@ function CrewCard({
         ) : (
           <span className="t-sm text-faint">Sol {member.hiredAtSol}</span>
         )}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="t-micro text-faint">Salary</span>
+        <span className="t-num text-[0.72rem] text-bone">{formatAmount(780 + member.rank * 140)}</span>
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="t-micro text-faint">Focus</span>
+        <span className="t-num text-[0.58rem] text-ash">{member.role}</span>
       </div>
     </button>
   );
@@ -302,6 +324,11 @@ function AssignmentSummary({
             {speed.toFixed(2)}×
           </span>
         </div>
+      </div>
+
+      <div className="mt-3 rounded-[3px] border border-white/8 bg-white/[0.03] px-2.5 py-2">
+        <span className="t-micro block text-faint">Current fit</span>
+        <p className="t-sm mt-1 leading-snug text-ash">{affinity.text}</p>
       </div>
 
       <p className="t-sm mt-3 leading-snug text-ash">

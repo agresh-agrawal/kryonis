@@ -21,9 +21,9 @@ import type { Profile } from '../state/useProfileStore';
 import type { PlacedBuilding } from '../state/useColonyStore';
 import type { TerrainConfig } from '../world/terrain';
 
-export const SAVE_VERSION = 3;
-const STORAGE_KEY = 'kryonis.save.v3';
-const LEGACY_STORAGE_KEYS = ['kryonis.save.v2', 'kryonis.save.v1'];
+export const SAVE_VERSION = 4;
+const STORAGE_KEY = 'kryonis.save.v4';
+const LEGACY_STORAGE_KEYS = ['kryonis.save.v3', 'kryonis.save.v2', 'kryonis.save.v1'];
 
 export interface SaveGame {
   version: number;
@@ -49,6 +49,9 @@ export interface SaveGame {
 
   /** Time controls, so a paused colony reloads paused. Absent before v3. */
   time?: { paused: boolean; speed: number };
+
+  /** Road tiles as flat grid indices. Absent before v4. */
+  roads?: number[];
 
   progress: {
     unlocked: ResearchId[];

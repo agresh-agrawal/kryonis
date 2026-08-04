@@ -29,6 +29,7 @@ import {
   type ResourceStock,
 } from '../core/resources';
 import type { PlacedBuilding } from '../state/useColonyStore';
+import { serviceOf } from '../world/roads';
 
 /** Per-colonist life support draw, per second. */
 export const LIFE_SUPPORT = {
@@ -246,6 +247,27 @@ export function stepColony(
 
   for (const building of buildings) {
     if (building.progress < 1 || !building.enabled) continue;
+
+    /*
+     * A structure only runs if its road is delivering what it needs.
+     *
+     * This replaces an earlier helper that flood-filled from the hub looking
+     * for `entry.type === 'road'` - a building type that has never existed in
+     * the catalog. The road set was therefore always empty, and the only
+     * structures that counted as connected were the ones physically touching
+     * the hub's own footprint. Everything else in the colony was silently
+     * producing nothing, with nothing on screen to say why.
+     *
+     * An unserviced structure still counts as *built* - it keeps its housing,
+     * which is a physical fact about it - but it produces nothing and draws no
+     * power, and `serviceProblem` tells the player exactly which of road,
+     * power or water is missing.
+     */
+    if (!serviceOf(building.id).operational) {
+      housing += BUILDINGS[building.type].housing;
+      continue;
+    }
+
     active.push(building);
     completedTypes.add(building.type);
 
@@ -306,10 +328,11 @@ export function stepColony(
   // ---- Production -------------------------------------------------------
   const capacity = computeCapacity(buildings, mods.storage);
   const efficiency = Math.max(0, Math.min(1, staffing * powerSatisfaction));
+  const utilityConnected = buildings.some((entry) => entry.type === 'road' && entry.progress >= 1 && entry.enabled);
 
   for (const building of active) {
     const def = BUILDINGS[building.type];
-    if (efficiency <= 0) break;
+    if (efficiency <= 0 || !utilityConnected) break;
 
     // An upgraded plant processes more of everything, inputs included.
     const scale = upgradeTier(building.level).output;

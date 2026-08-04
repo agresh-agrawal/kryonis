@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 
 import type { BuildingId } from '../buildings/catalog';
 import type { ResourceId } from '../core/resources';
 import type { MissionContext } from '../progress/missions';
 import { useColonyStore } from '../state/useColonyStore';
+import { useRoadStore } from '../state/useRoadStore';
 import { useCrewStore } from '../state/useCrewStore';
 import { currentDoctrine } from '../state/useProfileStore';
 import { useProgressStore } from '../state/useProgressStore';
@@ -32,6 +33,19 @@ const MAX_TICKS_PER_FRAME = 8;
 const PROGRESS_INTERVAL = 1;
 
 export function SimulationController() {
+  /*
+   * Re-solve the road networks whenever the colony's structures change.
+   *
+   * Placing a generator can energise a whole grid and demolishing one can kill
+   * it, so the network cannot be solved once at load. It is solved on change
+   * rather than per tick because it is O(tiles) and nothing about it moves
+   * between builds.
+   */
+  const buildings = useColonyStore((state) => state.buildings);
+  useEffect(() => {
+    useRoadStore.getState().resolve();
+  }, [buildings]);
+
   const paused = useTimeStore((state) => state.paused);
   const speed = useTimeStore((state) => state.speed);
   const accumulator = useRef(0);

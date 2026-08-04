@@ -4,7 +4,7 @@ import { create } from 'zustand';
 
 import type { BuildingId } from '../buildings/catalog';
 
-export type ColonyTool = 'select' | 'build' | 'demolish';
+export type ColonyTool = 'select' | 'build' | 'demolish' | 'road';
 
 interface BuildState {
   tool: ColonyTool;

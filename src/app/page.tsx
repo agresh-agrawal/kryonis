@@ -19,6 +19,7 @@ import { NewColony } from '@/game/ui/NewColony';
 import { Notifications } from '@/game/ui/Notifications';
 import { PlacementHint } from '@/game/ui/PlacementHint';
 import { ResearchConsole } from '@/game/ui/ResearchConsole';
+import { RoadChip } from '@/game/ui/RoadChip';
 import { SettingsMenu } from '@/game/ui/SettingsMenu';
 import { TerritoryChip } from '@/game/ui/TerritoryChip';
 import { TerritoryConsole } from '@/game/ui/TerritoryConsole';
@@ -31,6 +32,7 @@ import { useCrewStore } from '@/game/state/useCrewStore';
 import { useProfileStore } from '@/game/state/useProfileStore';
 import { useProgressStore } from '@/game/state/useProgressStore';
 import { useTimeStore } from '@/game/state/useTimeStore';
+import { useRoadStore } from '@/game/state/useRoadStore';
 import { useToastStore } from '@/game/state/useToastStore';
 import { useWorldStore } from '@/game/state/useWorldStore';
 
@@ -157,6 +159,7 @@ export default function Page() {
     useTimeStore.getState().reset();
     useProfileStore.getState().reset();
     useToastStore.getState().clear();
+    useRoadStore.getState().reset();
     useColonyStore.setState({
       buildings: [],
       selectedId: null,
@@ -263,6 +266,7 @@ export default function Page() {
           className="quiet-scroll absolute right-3 top-28 flex max-h-[calc(100dvh-10rem)] w-[min(17.5rem,calc(100vw-5rem))] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-0.5 min-[1180px]:right-4 min-[1180px]:top-36 min-[1180px]:max-h-[calc(100dvh-18rem)]"
         >
           <TerritoryChip onOpen={() => setSection('territory')} />
+          <RoadChip />
           <DirectivePanel />
           <FloatingInspector />
         </div>

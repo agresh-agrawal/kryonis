@@ -58,6 +58,15 @@ const Corridor = icon(
   </>,
 );
 
+const Road = icon(
+  <>
+    {GROUND}
+    <rect x="10" y="26" width="28" height="8" rx="2" />
+    <rect x="15" y="22" width="18" height="4" rx="1.2" opacity="0.7" />
+    <rect x="23" y="18" width="2" height="8" opacity="0.55" />
+  </>,
+);
+
 const Atrium = icon(
   <>
     {GROUND}
@@ -220,6 +229,7 @@ export const BUILDING_ICONS: Record<BuildingId, (props: IconProps) => React.Reac
   exportpad: ExportPad,
   habitat: Habitat,
   corridor: Corridor,
+  road: Road,
   atrium: Atrium,
   solar: Solar,
   battery: Battery,

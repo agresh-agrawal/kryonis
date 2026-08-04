@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
+import { Line } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -52,6 +53,7 @@ export function BuildingsLayer({
   const speed = useTimeStore((state) => state.speed);
 
   const materials = useMemo(() => new MaterialLibrary(), []);
+  const completionFlash = useRef(new Map<string, number>());
   useEffect(() => () => materials.dispose(), [materials]);
 
   // Group by type so each type can be instanced independently.
@@ -65,8 +67,47 @@ export function BuildingsLayer({
     return [...groups.entries()];
   }, [buildings]);
 
+  const utilityLinks = useMemo(() => {
+    const anchors = buildings.filter(
+      (building) => building.progress >= 1 && building.enabled && (building.type === 'road' || building.type === 'lander'),
+    );
+
+    return buildings.flatMap((building) => {
+      if (building.progress < 1 || !building.enabled || building.type === 'road' || building.type === 'lander') {
+        return [];
+      }
+
+      const from = buildingTransform(terrain, building);
+      let bestAnchor: PlacedBuilding | null = null;
+      let bestDistance = Infinity;
+
+      for (const anchor of anchors) {
+        const to = buildingTransform(terrain, anchor);
+        const distance = Math.hypot(from.x - to.x, from.z - to.z);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestAnchor = anchor;
+        }
+      }
+
+      if (!bestAnchor || bestDistance > 10) return [];
+
+      const to = buildingTransform(terrain, bestAnchor);
+      return [
+        {
+          id: building.id,
+          points: [
+            [from.x, from.y + 1.35, from.z],
+            [to.x, to.y + 0.45, to.z],
+          ] as [number, number, number][],
+          color: building.type === 'solar' || building.type === 'battery' ? '#f4cf5c' : '#5fd3ff',
+        },
+      ];
+    });
+  }, [buildings, terrain]);
+
   // Advance construction and drive time-of-day surfaces.
-  useFrame((_, rawDelta) => {
+  useFrame(({ clock }, rawDelta) => {
     const delta = Math.min(rawDelta, 0.25);
     materials.update(delta, currentSun.nightFactor);
 
@@ -85,6 +126,7 @@ export function BuildingsLayer({
       const current = constructionProgress.get(building.id) ?? 0;
       const next = current + (delta * speed) / Math.max(0.001, duration);
       if (next >= 1) {
+        completionFlash.current.set(building.id, clock.elapsedTime);
         completeConstruction(building.id);
       } else {
         constructionProgress.set(building.id, next);
@@ -96,6 +138,18 @@ export function BuildingsLayer({
     <group name="colony">
       {/* Pads first: they are what the structures above are standing on. */}
       <FoundationLayer terrain={terrain} quality={quality} materials={materials} />
+
+      {utilityLinks.map((link) => (
+        <Line
+          key={link.id}
+          points={link.points}
+          color={link.color}
+          lineWidth={1.2}
+          transparent
+          opacity={0.55}
+          depthTest={false}
+        />
+      ))}
 
       {byType.map(([type, list]) => (
         <BuildingTypeInstances
@@ -130,6 +184,7 @@ function BuildingTypeInstances({
   const model = useMemo(() => getBuildingModel(type), [type]);
   const materialKeys = useMemo(() => Object.keys(model) as MaterialKey[], [model]);
   const meshRefs = useRef(new Map<MaterialKey, THREE.InstancedMesh>());
+  const completionFlash = useRef(new Map<string, number>());
 
   const scratch = useMemo(
     () => ({
@@ -148,6 +203,7 @@ function BuildingTypeInstances({
     if (meshes.size === 0) return;
 
     const pulse = Math.sin(clock.elapsedTime * 4) * 0.5 + 0.5;
+    const flashMap = completionFlash.current;
 
     for (let i = 0; i < buildings.length; i++) {
       const building = buildings[i];
@@ -155,6 +211,10 @@ function BuildingTypeInstances({
 
       const progress =
         building.progress >= 1 ? 1 : (constructionProgress.get(building.id) ?? 0);
+      const isConnected = building.enabled;
+      const flashStart = flashMap.get(building.id) ?? -Infinity;
+      const flashAge = flashStart >= 0 ? clock.elapsedTime - flashStart : Infinity;
+      const flash = flashAge < 0.8 ? 1 - flashAge / 0.8 : 0;
 
       // Structures rise out of the ground as they are built. Starting at a
       // fraction rather than zero keeps the foundation pad visible from the
@@ -164,15 +224,17 @@ function BuildingTypeInstances({
       scratch.position.set(transform.x, transform.y, transform.z);
       scratch.euler.set(0, transform.rotationY, 0);
       scratch.quaternion.setFromEuler(scratch.euler);
-      scratch.scale.set(1, grow, 1);
+      scratch.scale.set(1 + flash * 0.06, grow * (1 + flash * 0.04), 1 + flash * 0.06);
       scratch.matrix.compose(scratch.position, scratch.quaternion, scratch.scale);
 
       if (progress < 1) {
         scratch.color.copy(UNDER_CONSTRUCTION_TINT);
+      } else if (!isConnected) {
+        scratch.color.set('#7a6c4f');
       } else if (building.id === selectedId) {
-        scratch.color.copy(COMPLETE_TINT).lerp(SELECTED_TINT, 0.35 + pulse * 0.35);
+        scratch.color.copy(COMPLETE_TINT).lerp(SELECTED_TINT, 0.35 + pulse * 0.35 + flash * 0.2);
       } else {
-        scratch.color.copy(COMPLETE_TINT);
+        scratch.color.copy(COMPLETE_TINT).lerp(COMPLETE_TINT, 1 - flash * 0.12);
       }
 
       for (const mesh of meshes.values()) {

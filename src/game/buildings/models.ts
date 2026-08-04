@@ -30,6 +30,7 @@ import {
   cylinder,
   dome,
   foundation,
+  pressureDome,
   legs,
   radiator,
   taperedCylinder,
@@ -112,8 +113,9 @@ export function habitatParts(): Part[] {
   // Regolith berm piled against the shell - the cheapest radiation shielding
   // available on Mars, and the reason real habitat concepts are half-buried.
   parts.push({ geo: taperedCylinder(2.55, 3.0, 0.85, 24), mat: 'concrete', pos: [0, 0.6, 0] });
+  parts.push({ geo: box(3.8, 0.2, 3.8), mat: 'soil', pos: [0, 0.3, 0] });
 
-  parts.push({ geo: dome(2.4, 28), mat: 'hull', pos: [0, 0.95, 0] });
+  parts.push({ geo: pressureDome(2.4, 28), mat: 'hull', pos: [0, 0.95, 0] });
   parts.push({ geo: torus(2.4, 0.07, 24), mat: 'metal', pos: [0, 1.0, 0], rot: [Math.PI / 2, 0, 0] });
   parts.push(...accentBand([0, 1.55, 0], 2.22));
 
@@ -135,7 +137,14 @@ export function habitatParts(): Part[] {
 
   // Roof-mounted life-support trunk.
   parts.push({ geo: cylinder(0.28, 0.7, 10), mat: 'metal', pos: [0, 3.4, 0] });
+  parts.push({ geo: box(0.7, 0.12, 0.7), mat: 'metal', pos: [0, 3.82, 0] });
   parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0, 3.85, 0], scale: 0.12 });
+
+  // Service walkways to make the habitat feel built rather than dropped.
+  parts.push({ geo: box(1.15, 0.08, 0.35), mat: 'metal', pos: [1.7, 0.15, 0] });
+  parts.push(...handrail([1.25, 0.18, -0.2], [2.15, 0.18, -0.2], 0.32));
+  parts.push({ geo: box(1.15, 0.08, 0.35), mat: 'metal', pos: [-1.7, 0.15, 0] });
+  parts.push(...handrail([-2.15, 0.18, -0.2], [-1.25, 0.18, -0.2], 0.32));
 
   return parts;
 }
@@ -159,6 +168,17 @@ export function corridorParts(): Part[] {
 
     ...foundation(2.2, 1.4, 0.12),
   ];
+}
+
+export function roadParts(): Part[] {
+  const parts: Part[] = [];
+  parts.push({ geo: box(1.2, 0.06, 1.2), mat: 'concrete', pos: [0, 0.03, 0] });
+  parts.push({ geo: box(0.1, 0.08, 1.06), mat: 'metal', pos: [0, 0.08, 0] });
+  parts.push({ geo: box(0.92, 0.04, 0.06), mat: 'accent', pos: [0, 0.12, 0.42] });
+  parts.push({ geo: box(0.92, 0.04, 0.06), mat: 'accent', pos: [0, 0.12, -0.42] });
+  parts.push({ geo: cylinder(0.045, 0.2, 8), mat: 'dark', pos: [0.28, 0.12, 0.28], rot: [0, 0, Math.PI / 2] });
+  parts.push({ geo: cylinder(0.045, 0.2, 8), mat: 'dark', pos: [-0.28, 0.12, -0.28], rot: [0, 0, Math.PI / 2] });
+  return parts;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +255,7 @@ export function reactorParts(): Part[] {
   // Buried shield plug with the reactor core above it.
   parts.push({ geo: taperedCylinder(0.95, 1.25, 0.8, 16), mat: 'concrete', pos: [0, 0.58, 0] });
   parts.push({ geo: cylinder(0.62, 1.35, 16), mat: 'gold', pos: [0, 1.65, 0] });
-  parts.push({ geo: dome(0.62, 16), mat: 'metal', pos: [0, 2.32, 0] });
+  parts.push({ geo: pressureDome(0.62, 16), mat: 'metal', pos: [0, 2.32, 0] });
   parts.push(...accentBand([0, 1.15, 0], 0.66));
 
   // Heat-rejection radiators - a fission plant is mostly a radiator.
@@ -768,7 +788,7 @@ export function atriumParts(): Part[] {
 
   // A large glazed dome - the one place colonists see open sky without a suit.
   parts.push({ geo: taperedCylinder(2.45, 2.7, 0.5, 24), mat: 'concrete', pos: [0, 0.42, 0] });
-  parts.push({ geo: dome(2.35, 30), mat: 'glass', pos: [0, 0.65, 0] });
+  parts.push({ geo: pressureDome(2.35, 30), mat: 'glass', pos: [0, 0.65, 0] });
 
   // Geodesic ribbing.
   for (let i = 0; i < 6; i++) {
@@ -785,6 +805,14 @@ export function atriumParts(): Part[] {
   parts.push({ geo: cylinder(1.5, 0.3, 20), mat: 'soil', pos: [0, 0.62, 0] });
   parts.push({ geo: cylinder(0.35, 0.9, 12), mat: 'soil', pos: [0, 1.1, 0] });
   parts.push({ geo: unitSphere(), mat: 'window', pos: [0, 2.2, 0], scale: 0.3 });
+
+  // A raised service ring and a few support struts make the atrium read as a
+  // cared-for civic space rather than a decorative dome on a pad.
+  parts.push({ geo: cylinder(0.28, 0.9, 14), mat: 'metal', pos: [0, 1.0, 0], rot: [Math.PI / 2, 0, 0] });
+  parts.push({ geo: box(0.16, 2.15, 0.16), mat: 'metal', pos: [1.1, 1.35, 0] });
+  parts.push({ geo: box(0.16, 2.15, 0.16), mat: 'metal', pos: [-1.1, 1.35, 0] });
+  parts.push({ geo: box(0.16, 2.15, 0.16), mat: 'metal', pos: [0, 1.35, 1.1] });
+  parts.push({ geo: box(0.16, 2.15, 0.16), mat: 'metal', pos: [0, 1.35, -1.1] });
 
   parts.push(...airlock([0, 0.85, 2.65], 0, 1.2, 0.48));
   return parts;

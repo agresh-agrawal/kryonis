@@ -32,6 +32,7 @@ import {
   mineParts,
   oxygenPlantParts,
   reactorParts,
+  roadParts,
   solarFarmParts,
   spaceportParts,
   storageParts,
@@ -42,6 +43,7 @@ export type BuildingId =
   | 'lander'
   | 'habitat'
   | 'corridor'
+  | 'road'
   | 'atrium'
   | 'solar'
   | 'battery'
@@ -199,6 +201,28 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     placeable: true,
     requires: [],
     buildParts: corridorParts,
+  },
+
+  road: {
+    id: 'road',
+    name: 'Service Road',
+    category: 'Logistics',
+    summary: 'Connects sectors to the colony spine and carries utility runs.',
+    description:
+      'A surfaced service road with embedded conduits. Every sector that needs power, water or crew movement has to tie into this spine to become truly functional.',
+    footprint: [1, 1],
+    cost: { money: 420, concrete: 6 },
+    buildTime: 6,
+    workers: 0,
+    housing: 0,
+    power: 0,
+    input: {},
+    output: {},
+    storage: {},
+    maxRelief: 1.0,
+    placeable: true,
+    requires: [],
+    buildParts: roadParts,
   },
 
   atrium: {

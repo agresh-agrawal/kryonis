@@ -11,6 +11,7 @@ import {
 } from '../buildings/catalog';
 import { RESOURCES, canAfford, formatAmount, type ResourceId } from '../core/resources';
 import { constructionProgress, useColonyStore } from '../state/useColonyStore';
+import { serviceProblem } from '../world/roads';
 import { BUILDING_ICONS } from './buildingIcons';
 import { UpgradeIcon } from './icons';
 import { useTicker } from './useTicker';
@@ -48,6 +49,15 @@ export function FloatingInspector() {
 
   const underWork = building_.progress < 1;
   const progress = underWork ? (constructionProgress.get(building_.id) ?? 0) : 1;
+
+  /*
+   * Why this structure is not running, if it is not.
+   *
+   * Recomputed every render rather than cached: the network changes whenever
+   * anything is built or demolished anywhere in the colony, and a stale answer
+   * here would be worse than none.
+   */
+  const problem = serviceProblem(building_);
 
   const atMax = building_.level >= MAX_UPGRADE_LEVEL;
   const nextTier = atMax ? null : UPGRADE_TIERS[building_.level];
@@ -91,6 +101,16 @@ export function FloatingInspector() {
                 : `Building · ${Math.round(progress * 100)}%`
               : tier.name}
           </span>
+
+          {/*
+            Why this structure is not running.
+            A dark building with no explanation is the worst possible feedback,
+            and connection problems are invisible from the outside - the road
+            might be there but carrying nothing.
+          */}
+          {!underWork && problem ? (
+            <span className="t-sm mt-1.5 block leading-snug text-alert">{problem}</span>
+          ) : null}
         </span>
 
         <button

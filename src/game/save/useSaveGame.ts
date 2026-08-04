@@ -4,6 +4,7 @@ import { BUILDING_IDS } from '../buildings/catalog';
 import { useColonyStore } from '../state/useColonyStore';
 import { useCrewStore } from '../state/useCrewStore';
 import { DEFAULT_PROFILE, useProfileStore } from '../state/useProfileStore';
+import { captureRoads, useRoadStore } from '../state/useRoadStore';
 import { useProgressStore } from '../state/useProgressStore';
 import { GAME_SPEEDS, useTimeStore, worldClock, type GameSpeed } from '../state/useTimeStore';
 import { useWorldStore } from '../state/useWorldStore';
@@ -42,6 +43,7 @@ export function captureSave(): SaveGame {
       doctrine: profile.doctrine,
     },
     time: { paused: time.paused, speed: time.speed },
+    roads: captureRoads(),
     colony: {
       buildings: colony.buildings,
       stock: colony.stock,
@@ -98,6 +100,8 @@ export function loadSave(): boolean {
     happiness: save.colony.happiness,
     batteryCharge: save.colony.batteryCharge,
   });
+  // Roads before the colony resolves, so the first solve sees both.
+  useRoadStore.getState().restore(save.roads ?? []);
   useCrewStore.getState().restore(save.crew);
   useCrewStore.getState().reconcilePopulation(save.colony.population);
 
