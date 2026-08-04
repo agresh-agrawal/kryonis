@@ -30,8 +30,17 @@ export function ModelGallery() {
 
   const entries = Object.entries(IMPORTED_MODELS) as [BuildingId, string][];
 
+  /*
+   * This page owns its own scrolling.
+   *
+   * `globals.css` sets `overflow: hidden` on html and body, which is correct
+   * for the game - the world should never scroll under the HUD - but it means a
+   * normal document route silently cannot scroll at all. Rather than relax the
+   * global rule and risk the game canvas gaining a scrollbar, this page is a
+   * full-height scroll container in its own right.
+   */
   return (
-    <main className="min-h-dvh bg-void px-6 py-8 min-[1180px]:px-10">
+    <main className="gallery-scroll h-dvh overflow-y-auto bg-void px-6 py-8 min-[1180px]:px-10">
       <header className="mx-auto max-w-[100rem]">
         <h1 className="text-[1.8rem] leading-none font-light tracking-[0.4em] text-bone">
           IMPORTED MODELS

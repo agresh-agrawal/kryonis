@@ -339,6 +339,33 @@ body {
   background: transparent;
 }
 
+/*
+ * A scrollbar you can actually see and grab.
+ *
+ * `quiet-scroll` is 4px and near-invisible, which is right inside a HUD panel
+ * where the scrollbar must not compete with the world. On a full page that is
+ * mostly a long scroll, the same restraint just hides the fact that there is
+ * anything below the fold at all.
+ */
+.gallery-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: var(--color-titanium) rgb(255 255 255 / 0.04);
+}
+.gallery-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+.gallery-scroll::-webkit-scrollbar-track {
+  background: rgb(255 255 255 / 0.04);
+}
+.gallery-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-titanium);
+  border: 3px solid var(--color-void);
+  border-radius: 6px;
+}
+.gallery-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-steel);
+}
+
 /* Edge fades on horizontal scrollers, so content dissolves rather than clips. */
 @utility fade-edges-x {
   mask-image: linear-gradient(
