@@ -44,7 +44,16 @@ export const IMPORTED_MODELS: Partial<Record<BuildingId, string>> = {
   // The three large blocks recovered from the Mars colony diorama.
   habitat: 'kit-block-a.glb',
   atrium: 'kit-block-b.glb',
-  lander: 'kit-block-c.glb',
+
+  /*
+   * The colony hub.
+   *
+   * A fortified tower with a landing deck on the roof and a gate at the base -
+   * the structure the game opens on, sitting at the centre of the crater. Every
+   * road runs back to it and everything the colony buys or sells passes through
+   * it, so it replaces the smaller diorama block that stood in for the lander.
+   */
+  lander: 'hub-tower.glb',
 };
 
 /*

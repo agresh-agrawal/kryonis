@@ -259,6 +259,26 @@ function groupByMaterialKey(document, forceMaterial = null) {
  * readable rather than to match the source model's proportions.
  */
 const TARGETS = [
+  /*
+   * The colony hub.
+   *
+   * A fortified tower with a flat landing deck on the roof and a gate at the
+   * base. This is where the game starts and where everything arrives and
+   * leaves, so it is deliberately the largest structure in the colony and the
+   * one every road runs back to.
+   *
+   * Nearly a million triangles and three 4K textures on the way in; the
+   * geometry survives, the textures do not - it is lit with the game's own
+   * palette like every other import.
+   */
+  {
+    source: 'watchtower.glb',
+    out: 'hub-tower.glb',
+    footprint: 7.2,
+    height: 10.5,
+    maxTriangles: 16000,
+  },
+
   // --- The three hero models --------------------------------------------
   { source: 'reactor.glb', out: 'reactor.glb', footprint: 3.7, height: 4.4, maxTriangles: 9000 },
   {

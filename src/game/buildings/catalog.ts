@@ -137,12 +137,12 @@ export interface BuildingDef {
 export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   lander: {
     id: 'lander',
-    name: 'Command Lander',
+    name: 'Colony Hub',
     category: 'Habitation',
     summary: 'The craft that brought you here.',
     description:
-      'Your descent vehicle, repurposed as the colony core. It provides initial housing, power and comms, but it will never be enough on its own.',
-    footprint: [3, 3],
+      'The landing tower. Its roof is the pad every supply run sets down on, and its gate is where the crew walk out onto Mars. Everything the colony buys or sells passes through here, and every road runs back to it.',
+    footprint: [4, 4],
     cost: {},
     buildTime: 0,
     workers: 0,

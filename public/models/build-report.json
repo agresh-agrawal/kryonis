@@ -1,5 +1,16 @@
 [
   {
+    "source": "watchtower.glb",
+    "out": "hub-tower.glb",
+    "beforeMB": 31.8,
+    "afterMB": 1.15,
+    "beforeTris": 965588,
+    "afterTris": 15982,
+    "materials": [
+      "metal"
+    ]
+  },
+  {
     "source": "reactor.glb",
     "out": "reactor.glb",
     "beforeMB": 44.3,
