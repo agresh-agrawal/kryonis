@@ -202,11 +202,17 @@ export function computeCapacity(
 ): ResourceStock {
   const capacity = emptyStock();
   for (const id of RESOURCE_IDS) {
-    const base = BUILDINGS.lander.storage[id];
     // Economy resources are unbounded; everything physical needs a tank.
     capacity[id] = id === 'money' || id === 'research' || id === 'reputation' ? Infinity : 0;
-    if (base) capacity[id] += base;
   }
+
+  /*
+   * The hub's own tanks are counted once, in the loop below, like every other
+   * structure. They used to be seeded here *as well*, which doubled them - and
+   * the visible symptom was a readout saying "318 of 240": the lander delivered
+   * more oxygen than the game believed it could hold, so the surplus was
+   * silently destroyed the first time anything produced.
+   */
 
   for (const building of buildings) {
     if (building.progress < 1) continue;

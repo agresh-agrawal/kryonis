@@ -25,6 +25,7 @@ import {
   upgradeCost,
   type BuildingId,
 } from '../buildings/catalog';
+import { setRoad } from '../world/roads';
 import { currentDoctrine } from './useProfileStore';
 import { useProgressStore } from './useProgressStore';
 import {
@@ -117,73 +118,7 @@ function reindexOccupancy(buildings: PlacedBuilding[]): void {
   buildings.forEach((building, index) => stampFootprint(building, index + 1));
 }
 
-function tileKey(tx: number, tz: number): string {
-  return `${tx},${tz}`;
-}
 
-function footprintTiles(building: Pick<PlacedBuilding, 'type' | 'tx' | 'tz' | 'rotation'>): [number, number][] {
-  const [w, d] = rotatedFootprint(building.type, building.rotation);
-  const tiles: [number, number][] = [];
-  for (let dz = 0; dz < d; dz++) {
-    for (let dx = 0; dx < w; dx++) {
-      tiles.push([building.tx + dx, building.tz + dz]);
-    }
-  }
-  return tiles;
-}
-
-function refreshBuildingConnectivity(buildings: PlacedBuilding[]): PlacedBuilding[] {
-  const roadTiles = new Set<string>();
-  const landerTiles = new Set<string>();
-
-  for (const building of buildings) {
-    if (building.progress < 1) continue;
-    if (building.type === 'road') {
-      for (const [tx, tz] of footprintTiles(building)) roadTiles.add(tileKey(tx, tz));
-    }
-    if (building.type === 'lander') {
-      for (const [tx, tz] of footprintTiles(building)) landerTiles.add(tileKey(tx, tz));
-    }
-  }
-
-  const connected = new Set<string>();
-  const queue = Array.from(landerTiles);
-  while (queue.length) {
-    const current = queue.pop();
-    if (!current || connected.has(current)) continue;
-    connected.add(current);
-
-    const [x, z] = current.split(',').map(Number);
-    for (const [nx, nz] of [
-      [x + 1, z],
-      [x - 1, z],
-      [x, z + 1],
-      [x, z - 1],
-    ]) {
-      const key = tileKey(nx, nz);
-      if ((roadTiles.has(key) || landerTiles.has(key)) && !connected.has(key)) queue.push(key);
-    }
-  }
-
-  return buildings.map((building) => {
-    if (building.type === 'lander') return { ...building, enabled: true };
-    if (building.progress < 1) return building;
-
-    const tiles = footprintTiles(building);
-    const connectedToInfrastructure = tiles.some(([tx, tz]) => {
-      const key = tileKey(tx, tz);
-      if (connected.has(key)) return true;
-      return [
-        [tx + 1, tz],
-        [tx - 1, tz],
-        [tx, tz + 1],
-        [tx, tz - 1],
-      ].some(([nx, nz]) => connected.has(tileKey(nx, nz)));
-    });
-
-    return { ...building, enabled: building.enabled && connectedToInfrastructure };
-  });
-}
 
 /** World-space centre and rotation of a placed building. */
 export function buildingTransform(
@@ -354,8 +289,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
         const numeric = Number.parseInt(building.id.replace(/^b/, ''), 10);
         return Number.isFinite(numeric) ? Math.max(highest, numeric) : highest;
       }, 0) + 1;
-
-    const buildings = refreshBuildingConnectivity(snapshot.buildings);
+      const buildings = snapshot.buildings;
 
     set({
       buildings,
@@ -427,8 +361,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
       enabled: true,
       level: 1,
     };
-
-    const buildings = refreshBuildingConnectivity([lander]);
+      const buildings = [lander];
     reindexOccupancy(buildings);
 
     // Doctrine is applied here rather than at the opening screen, so that a
@@ -446,7 +379,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
     }
 
     set({
-      buildings: refreshBuildingConnectivity(buildings),
+      buildings,
       stock,
       unlockedRadius: START_UNLOCK_RADIUS,
       selectedId: null,
@@ -566,6 +499,15 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
   },
 
   place: (terrain, type, tx, tz, rotation) => {
+    /*
+     * The Service Road in the build deck and the road grid are the same thing.
+     *
+     * Roads exist twice by necessity: as a catalog entry so they are
+     * discoverable in the build deck, and as a flat grid so the network solver
+     * and the renderer can treat them as a graph rather than as two hundred
+     * separate buildings. Placing one has to write both, or a road laid from
+     * the deck would look like a road and connect nothing.
+     */
     const check = get().checkPlacement(terrain, type, tx, tz, rotation);
     if (!check.valid) return false;
 
@@ -584,8 +526,12 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
 
     if (building.progress < 1) constructionProgress.set(building.id, 0);
 
+    // The catalog entry and the utility grid are the same road. Writing only
+    // one of them would give a road that looks laid and carries nothing.
+    if (type === 'road') setRoad(tx, tz, true);
+
     set((state) => {
-      const buildings = refreshBuildingConnectivity([...state.buildings, building]);
+      const buildings = [...state.buildings, building];
       stampFootprint(building, buildings.length);
 
       const stock = { ...state.stock };
@@ -602,10 +548,15 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
   demolish: (id) => {
     constructionProgress.delete(id);
     set((state) => {
+      // Clearing the grid tile as well, or the network keeps routing power
+      // through a road that is no longer on the map.
+      const removed = state.buildings.find((building) => building.id === id);
+      if (removed?.type === 'road') setRoad(removed.tx, removed.tz, false);
+
       const buildings = state.buildings.filter((building) => building.id !== id);
       reindexOccupancy(buildings);
       return {
-        buildings: refreshBuildingConnectivity(buildings),
+        buildings,
         selectedId: state.selectedId === id ? null : state.selectedId,
       };
     });
@@ -632,13 +583,11 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
 
     set({
       stock,
-      buildings: refreshBuildingConnectivity(
-        state.buildings.map((entry) =>
+      buildings: state.buildings.map((entry) =>
           entry.id === id
             ? { ...entry, level: entry.level + 1, progress: tier.buildTime > 0 ? 0 : 1 }
             : entry,
         ),
-      ),
     });
 
     return true;
@@ -647,9 +596,7 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
   completeConstruction: (id) => {
     constructionProgress.delete(id);
     set((state) => ({
-      buildings: refreshBuildingConnectivity(
-        state.buildings.map((building) => (building.id === id ? { ...building, progress: 1 } : building)),
-      ),
+      buildings: state.buildings.map((building) => (building.id === id ? { ...building, progress: 1 } : building)),
     }));
   },
 
