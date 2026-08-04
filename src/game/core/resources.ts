@@ -71,6 +71,58 @@ export const RESOURCES: Record<ResourceId, ResourceDef> = {
 
 export const RESOURCE_IDS = Object.keys(RESOURCES) as ResourceId[];
 
+/**
+ * What Earth pays for a unit, in credits.
+ *
+ * This is the whole economy, and until now it did not exist: only three of
+ * eighteen structures earned anything, all of them late, so a colony could mine
+ * ore and grow food for hours and still go broke. Producing goods with no way
+ * to sell them is not a difficulty curve, it is a missing rule.
+ *
+ * Prices are ordered by how hard the thing is to make rather than by real-world
+ * value. Raw regolith products are near-worthless; anything that took power,
+ * water and a chemical plant to produce is worth shipping. Fuel is the most
+ * valuable because propellant made on Mars is the entire reason anyone funds a
+ * Mars colony - you are selling the return trip.
+ *
+ * Life-support resources are deliberately cheap. Selling your own oxygen for a
+ * quick profit should always be a bad trade.
+ */
+export const EXPORT_PRICE: Partial<Record<ResourceId, number>> = {
+  ice: 0.6,
+  carbon: 1.6,
+  iron: 2.2,
+  silicon: 3.0,
+  aluminium: 3.8,
+  fuel: 9.0,
+};
+
+/**
+ * What is deliberately *not* sellable, and why.
+ *
+ * Oxygen, water and food are life support. A player who sells their own air
+ * for a quick profit has been handed a trap, not a choice.
+ *
+ * Concrete is the construction material. An early build of this shipped it,
+ * and the export terminal quietly sold the concrete needed for the next
+ * habitat - the colony got richer and became unable to build. A trade that
+ * takes the thing you were saving is indistinguishable from a bug.
+ */
+
+/**
+ * Units of a resource held back from export, absolute.
+ *
+ * Deliberately not a fraction of capacity: that scales the reserve up as you
+ * add storage, so building a depot would *reduce* how much you could sell,
+ * which is precisely backwards.
+ */
+export const EXPORT_RESERVE_UNITS = 45;
+
+/** Resources Earth will buy, richest first. */
+export const EXPORTABLE = (Object.keys(EXPORT_PRICE) as ResourceId[]).sort(
+  (a, b) => (EXPORT_PRICE[b] ?? 0) - (EXPORT_PRICE[a] ?? 0),
+);
+
 /** A partial bundle of resources - used for costs, yields and deltas. */
 export type ResourceBundle = Partial<Record<ResourceId, number>>;
 

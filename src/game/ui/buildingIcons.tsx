@@ -202,8 +202,22 @@ const Spaceport = icon(
   </>,
 );
 
+/** Export Terminal: a canister on a pad with a cargo container beside it. */
+const ExportPad = icon(
+  <>
+    {GROUND}
+    <ellipse cx="17" cy="31" rx="11" ry="4" opacity="0.4" />
+    <path d="M17 9c2.4 3.2 3.5 6.8 3.5 10.2V27h-7v-7.8C13.5 15.8 14.6 12.2 17 9z" />
+    <path d="M11 27l2.5-3M23 27l-2.5-3" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
+    <rect x="30" y="20" width="12" height="8" rx="1" opacity="0.75" />
+    <path d="M30 24h12" stroke="currentColor" strokeWidth="1.2" opacity="0.5" />
+    <path d="M36 20v-4h8" stroke="currentColor" strokeWidth="1.6" fill="none" opacity="0.6" />
+  </>,
+);
+
 export const BUILDING_ICONS: Record<BuildingId, (props: IconProps) => React.ReactElement> = {
   lander: Lander,
+  exportpad: ExportPad,
   habitat: Habitat,
   corridor: Corridor,
   atrium: Atrium,

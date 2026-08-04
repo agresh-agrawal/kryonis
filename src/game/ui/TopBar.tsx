@@ -1,5 +1,6 @@
 'use client';
 
+import { SOL_DURATION_SECONDS } from '../core/constants';
 import { RESOURCES, formatAmount, type ResourceId } from '../core/resources';
 import { useColonyStore } from '../state/useColonyStore';
 import { ColonistsIcon, PowerIcon, RESOURCE_ICONS } from './icons';
@@ -102,8 +103,18 @@ function Readout({
 
   const bounded = Number.isFinite(capacity) && capacity > 0;
   const low = bounded && amount / capacity < 0.15;
-  const perHour = rate * 3600;
-  const moving = Math.abs(perHour) >= 0.5;
+
+  /*
+   * Credits are reported per sol; everything else per hour.
+   *
+   * A trickle of a fraction of a credit per second is true and useless - it
+   * rounds to nothing on screen, which is exactly why the strip used to look
+   * like credits never moved at all. Per sol is the unit the player already
+   * thinks in, because it is the unit directives and wages are quoted in.
+   */
+  const perSol = id === 'money';
+  const scaled = rate * (perSol ? SOL_DURATION_SECONDS : 3600);
+  const moving = Math.abs(scaled) >= 0.5;
 
   return (
     <div
@@ -126,9 +137,13 @@ function Readout({
           {formatAmount(amount)}
         </span>
         {moving ? (
-          <span className={`t-num text-[0.58rem] ${perHour > 0 ? 'text-good' : 'text-alert'}`}>
-            {perHour > 0 ? '+' : ''}
-            {formatAmount(perHour)}
+          <span
+            className={`t-num text-[0.58rem] ${scaled > 0 ? 'text-good' : 'text-alert'}`}
+            title={perSol ? 'Credits per sol' : 'Per hour'}
+          >
+            {scaled > 0 ? '+' : ''}
+            {formatAmount(scaled)}
+            {perSol ? <span className="text-faint">/sol</span> : null}
           </span>
         ) : null}
       </span>

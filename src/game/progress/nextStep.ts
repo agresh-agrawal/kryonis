@@ -23,6 +23,8 @@ export interface NextStep {
 
 export interface NextStepContext {
   stats: ColonyStats;
+  /** Credits on hand, so the advisor can spot a colony that is stuck broke. */
+  credits: number;
   stock: ResourceStock;
   counts: Record<string, number>;
   totalBuildings: number;
@@ -63,6 +65,30 @@ export function suggestNextStep(ctx: NextStepContext): NextStep {
   }
   if (!counts.greenhouse) {
     return { text: 'Build a greenhouse before the food runs out', tone: 'warn' };
+  }
+
+  /*
+   * Then money, before growth.
+   *
+   * A colony with no income is not slow, it is stopped - every remaining
+   * action costs credits it will never get. This sits above the growth advice
+   * because telling somebody to hire crew they cannot pay for is worse than
+   * saying nothing.
+   */
+  if (!counts.exportpad) {
+    if (ctx.credits < 4000) {
+      return {
+        text: 'Running out of credits - build an Export Terminal to start earning',
+        tone: 'critical',
+      };
+    }
+    return { text: 'Build an Export Terminal to sell surplus to Earth', tone: 'warn' };
+  }
+  if (ctx.stats.exportIncome <= 0.001) {
+    return {
+      text: 'Nothing to export yet - mine ore or make fuel and it sells itself',
+      tone: 'warn',
+    };
   }
 
   // --- Then growth. -------------------------------------------------------

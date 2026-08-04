@@ -68,6 +68,7 @@ export function DirectiveConsole({ onClose }: { onClose: () => void }) {
     stock,
     counts,
     totalBuildings,
+    credits: stock.money,
     vacancies: Math.max(0, stats.housing - roster.length),
     hasResearchLead: assignedResearcherId !== null,
     researchRunning: project !== null,

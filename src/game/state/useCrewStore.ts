@@ -124,8 +124,21 @@ export const useCrewStore = create<CrewState>((set, get) => ({
 }));
 
 export function hiringCost(rosterSize: number, skill: CrewSkill): number {
-  const skillPremium = skill === 'Medicine' ? 900 : skill === 'Engineering' ? 650 : 500;
-  return 1800 + rosterSize * 420 + skillPremium;
+  const skillPremium = skill === 'Medicine' ? 300 : skill === 'Engineering' ? 220 : 170;
+  /*
+   * Deliberately cheap, and rising slowly.
+   *
+   * The old curve started at roughly 4,000 credits for the fifth colonist and
+   * climbed 420 per hire after that, against an income of a few hundred a sol.
+   * A colony therefore could not afford to staff the buildings it had already
+   * paid for: everything ran at a fraction of capacity, oxygen production fell
+   * below what the crew breathed, and the colony suffocated. Simulating
+   * fourteen sols of ordinary play ended with the entire crew dead, every time.
+   *
+   * Crew are the thing that makes every other investment work. They should be
+   * the easy purchase, not the hardest one.
+   */
+  return 620 + rosterSize * 140 + skillPremium;
 }
 
 export function researchDiscount(member: CrewMember | undefined, branch: ResearchBranch): number {

@@ -62,6 +62,15 @@ export const MISSIONS: Mission[] = [
     measure: (ctx) => count(ctx, 'oxygen'),
   },
   {
+    id: 'first-export',
+    title: 'Start Earning',
+    detail:
+      'Build an Export Terminal. Anything you stockpile above a safe reserve gets sold to Earth - that is where credits come from.',
+    target: 1,
+    reward: { money: 2400 },
+    measure: (ctx) => count(ctx, 'exportpad'),
+  },
+  {
     id: 'shelter',
     title: 'Get Everyone Indoors',
     detail: 'Two habitat domes. Your crew are still sleeping in the lander, and they have noticed.',

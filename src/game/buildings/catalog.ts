@@ -35,6 +35,7 @@ import {
   solarFarmParts,
   spaceportParts,
   storageParts,
+  exportPadParts,
 } from './models';
 
 export type BuildingId =
@@ -50,6 +51,7 @@ export type BuildingId =
   | 'greenhouse'
   | 'mine'
   | 'storage'
+  | 'exportpad'
   | 'factory'
   | 'fuelplant'
   | 'lab'
@@ -209,7 +211,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [3, 3],
     cost: { money: 5400, concrete: 40 },
     buildTime: 30,
-    workers: 2,
+    workers: 1,
     housing: 0,
     power: -9,
     input: { water: 0.08 },
@@ -233,7 +235,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     buildTime: 12,
     workers: 0,
     housing: 0,
-    power: 18,
+    power: 26,
     input: {},
     output: {},
     storage: {},
@@ -297,7 +299,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [2, 2],
     cost: { money: 2600 },
     buildTime: 18,
-    workers: 2,
+    workers: 1,
     housing: 0,
     power: -14,
     input: {},
@@ -319,7 +321,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [2, 2],
     cost: { money: 3100 },
     buildTime: 20,
-    workers: 3,
+    workers: 1,
     housing: 0,
     power: -16,
     input: {},
@@ -342,7 +344,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [3, 2],
     cost: { money: 3400, concrete: 30 },
     buildTime: 22,
-    workers: 3,
+    workers: 1,
     housing: 0,
     power: -12,
     input: { water: 0.22 },
@@ -364,12 +366,27 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [2, 2],
     cost: { money: 2400, concrete: 20 },
     buildTime: 18,
-    workers: 4,
+    workers: 2,
     housing: 0,
     power: -15,
     input: {},
-    output: {},
-    storage: {},
+    /*
+     * Ore. This used to be empty.
+     *
+     * A mine that employs four people, draws fifteen kilowatts, demands a
+     * mineral deposit under it and produces nothing was the root of a dead
+     * economy: iron had no source, so the fabrication plant could never run,
+     * so concrete could never be made, so after the starting stock ran out the
+     * colony could not build anything that needed it. Every downstream
+     * shortage traced back to this one empty object.
+     *
+     * The blend is deliberately mixed rather than keyed to the deposit type.
+     * A single mine feeding all three industrial metals means one building
+     * unblocks the whole chain, which is the right shape for the first
+     * industry a player puts up.
+     */
+    output: { iron: 0.22, aluminium: 0.13, silicon: 0.07 },
+    storage: { iron: 60, aluminium: 60, silicon: 40 },
     requiresDeposit: [
       DepositKind.Iron,
       DepositKind.Aluminium,
@@ -405,6 +422,39 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     buildParts: storageParts,
   },
 
+  /*
+   * The Export Terminal.
+   *
+   * The building the economy was missing. Before it existed only three
+   * structures earned credits and all three were late, so a colony could mine
+   * ore and grow food for hours and still go broke - the goods had nowhere to
+   * go. This is where they go.
+   *
+   * Deliberately cheap and early. It is the answer to "how do I make money",
+   * and an answer the player cannot afford is not an answer.
+   */
+  exportpad: {
+    id: 'exportpad',
+    name: 'Export Terminal',
+    category: 'Industry',
+    summary: 'Ships surplus to Earth. This is how you earn credits.',
+    description:
+      'A launch cradle and cargo handler. Anything you are holding above a safe reserve gets packed and sold to Earth, most valuable cargo first. Fuel pays best by a wide margin - propellant made on Mars is the whole reason anyone funds a colony here.',
+    footprint: [3, 2],
+    cost: { money: 1900, concrete: 30 },
+    buildTime: 12,
+    workers: 1,
+    housing: 0,
+    power: -6,
+    input: {},
+    output: {},
+    storage: { fuel: 80, iron: 80, aluminium: 80 },
+    maxRelief: 0.9,
+    placeable: true,
+    requires: ['storage'],
+    buildParts: exportPadParts,
+  },
+
   factory: {
     id: 'factory',
     name: 'Fabrication Plant',
@@ -415,11 +465,14 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [3, 2],
     cost: { money: 4600 },
     buildTime: 28,
-    workers: 5,
+    workers: 2,
     housing: 0,
     power: -22,
-    input: { iron: 0.12 },
-    output: { concrete: 0.35 },
+    // Alloy is the high-value export; concrete is what the colony builds with.
+    // Producing both means the plant is worth running even when you are not
+    // building, which is what keeps a mature colony earning.
+    input: { iron: 0.18, silicon: 0.04 },
+    output: { concrete: 0.4, aluminium: 0.09 },
     storage: { concrete: 120 },
     maxRelief: 1.2,
     placeable: true,
@@ -437,7 +490,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [3, 2],
     cost: { money: 6400 },
     buildTime: 34,
-    workers: 4,
+    workers: 2,
     housing: 0,
     power: -26,
     input: { water: 0.18, carbon: 0.06 },
@@ -459,7 +512,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [3, 2],
     cost: { money: 5200 },
     buildTime: 30,
-    workers: 4,
+    workers: 2,
     housing: 0,
     power: -18,
     input: {},
@@ -481,7 +534,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [2, 2],
     cost: { money: 3800 },
     buildTime: 24,
-    workers: 3,
+    workers: 1,
     housing: 0,
     power: -10,
     input: { water: 0.05 },
@@ -503,7 +556,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [2, 2],
     cost: { money: 4400 },
     buildTime: 26,
-    workers: 2,
+    workers: 1,
     housing: 0,
     power: -13,
     input: {},
@@ -525,7 +578,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     footprint: [4, 4],
     cost: { money: 14000, concrete: 120 },
     buildTime: 55,
-    workers: 4,
+    workers: 3,
     housing: 0,
     power: -20,
     input: { water: 0.1, carbon: 0.05 },

@@ -847,3 +847,79 @@ export function placeholderParts(): Part[] {
     { geo: box(1.6, 0.1, 1.6), mat: 'metal', pos: [0, 0.05, 0] },
   ];
 }
+
+
+// ---------------------------------------------------------------------------
+// Export Terminal - where the colony turns goods into credits.
+// ---------------------------------------------------------------------------
+
+/**
+ * The Export Terminal.
+ *
+ * A blast cradle, a cargo canister sitting in it, and the handling gear that
+ * loads one. The read has to be immediate: this is the building that ships
+ * things off Mars, so the silhouette is a rocket-shaped canister standing on a
+ * pad, and everything else is the machinery that fills it.
+ */
+export function exportPadParts(): Part[] {
+  const parts: Part[] = [...foundation(5.6, 3.6)];
+
+  // --- Blast pad and cradle ----------------------------------------------
+  parts.push({ geo: cylinder(1.5, 0.22, 16), mat: 'concrete', pos: [-1.3, 0.24, 0] });
+  parts.push({ geo: torus(1.5, 0.08, 18), mat: 'hazard', pos: [-1.3, 0.34, 0], rot: [Math.PI / 2, 0, 0] });
+
+  // Four cradle arms holding the canister off the deck.
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    parts.push({
+      geo: box(0.16, 0.9, 0.16),
+      mat: 'metal',
+      pos: [-1.3 + Math.cos(a) * 1.05, 0.7, Math.sin(a) * 1.05],
+      rot: [Math.sin(a) * 0.16, 0, -Math.cos(a) * 0.16],
+    });
+  }
+
+  // --- The cargo canister -------------------------------------------------
+  parts.push({ geo: cylinder(0.78, 2.5, 18), mat: 'hull', pos: [-1.3, 2.2, 0] });
+  parts.push({ geo: unitCone(), mat: 'hull', pos: [-1.3, 3.9, 0], scale: [0.78, 1.0, 0.78] });
+  parts.push({ geo: torus(0.8, 0.055, 18), mat: 'metal', pos: [-1.3, 1.4, 0], rot: [Math.PI / 2, 0, 0] });
+  parts.push({ geo: torus(0.8, 0.055, 18), mat: 'metal', pos: [-1.3, 2.9, 0], rot: [Math.PI / 2, 0, 0] });
+  parts.push(...accentBand([-1.3, 2.15, 0], 0.82));
+
+  // Engine bell under the canister, and its hold-down clamps.
+  parts.push({ geo: unitCone(), mat: 'dark', pos: [-1.3, 0.75, 0], rot: [Math.PI, 0, 0], scale: [0.34, 0.5, 0.34] });
+
+  // --- Cargo handling -----------------------------------------------------
+  // Gantry mast with a loading arm reaching to the canister hatch.
+  parts.push({ geo: box(0.24, 3.4, 0.24), mat: 'metal', pos: [0.4, 1.9, -1.0] });
+  parts.push({ geo: box(1.5, 0.16, 0.2), mat: 'metal', pos: [-0.35, 3.1, -1.0] });
+  parts.push(...pipeRun([0.4, 2.6, -1.0], [-0.55, 2.6, -0.35], 0.06));
+  parts.push(...ladder([0.4, 0.18, -0.82], 3.3, 0));
+
+  // Containerised cargo waiting to be loaded, on a marked-out yard.
+  parts.push({ geo: box(2.2, 0.05, 2.4), mat: 'concrete', pos: [1.6, 0.2, 0.2] });
+  for (let i = 0; i < 3; i++) {
+    parts.push({
+      geo: box(1.0, 0.5, 0.56),
+      mat: i === 1 ? 'metal' : 'hull',
+      pos: [1.5 + (i % 2) * 0.12, 0.47 + Math.floor(i / 2) * 0.5, -0.5 + (i % 3) * 0.62],
+    });
+  }
+
+  // Handling crane over the yard.
+  parts.push({ geo: box(0.14, 1.7, 0.14), mat: 'metal', pos: [2.5, 1.05, -0.8] });
+  parts.push({ geo: box(0.14, 1.7, 0.14), mat: 'metal', pos: [2.5, 1.05, 1.2] });
+  parts.push({ geo: box(0.16, 0.16, 2.2), mat: 'metal', pos: [2.5, 1.9, 0.2] });
+  parts.push({ geo: cylinder(0.02, 0.7, 5), mat: 'metal', pos: [2.5, 1.5, 0.2] });
+  parts.push({ geo: box(0.3, 0.2, 0.3), mat: 'dark', pos: [2.5, 1.12, 0.2] });
+
+  // --- Operations ---------------------------------------------------------
+  // The manifest desk: this is a shipping office as much as a launch pad.
+  parts.push({ geo: box(1.0, 0.85, 0.8), mat: 'hull', pos: [0.5, 0.6, 1.35] });
+  parts.push(...ventGrille([0.5, 0.55, 1.76], 0.5, 0.3));
+  parts.push(...controlPanel([0.5, 1.12, 1.3], 0, 0.85));
+  parts.push(...handrail([-0.2, 0.2, 1.75], [1.2, 0.2, 1.75], 0.42));
+
+  parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0.4, 3.68, -1.0], scale: 0.1 });
+  return parts;
+}

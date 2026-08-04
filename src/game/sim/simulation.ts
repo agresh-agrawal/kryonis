@@ -20,6 +20,9 @@
 
 import { BUILDINGS, upgradeTier, type BuildingId } from '../buildings/catalog';
 import {
+  EXPORTABLE,
+  EXPORT_PRICE,
+  EXPORT_RESERVE_UNITS,
   RESOURCE_IDS,
   emptyStock,
   type ResourceId,
@@ -34,8 +37,16 @@ export const LIFE_SUPPORT = {
   food: 0.011,
 } as const;
 
-/** Energy a single Power Cell Bank holds, in kilowatt-seconds. */
-export const BATTERY_CAPACITY = 9000;
+/**
+ * Energy a single Power Cell Bank holds, in kilowatt-seconds.
+ *
+ * Night is half of every sol and solar produces nothing through it, so this
+ * number decides whether a solar colony is viable at all before the reactor is
+ * reachable. At 9,000 it took six banks to carry a modest colony overnight,
+ * which no early colony can afford - simulated play sat at 35-49% power
+ * satisfaction for a dozen sols and never recovered.
+ */
+export const BATTERY_CAPACITY = 17000;
 
 export interface ColonyAlert {
   id: string;
@@ -43,8 +54,21 @@ export interface ColonyAlert {
   message: string;
 }
 
+/**
+ * Units a single terminal can ship per second, before upgrades.
+ *
+ * Set against building costs rather than against production: one terminal over
+ * a fully supplied mine should be earning enough to put up a structure every
+ * couple of sols, because that is the pace at which the game stays moving.
+ */
+export const EXPORT_THROUGHPUT = 1.4;
+
 export interface ColonyStats {
   population: number;
+  /** Credits per second currently being earned by exporting surplus. */
+  exportIncome: number;
+  /** What is actually being shipped, richest first, for the trade readout. */
+  exporting: { resource: ResourceId; rate: number; credits: number }[];
   housing: number;
   jobs: number;
   /** Colonists actually filling a job. */
@@ -144,6 +168,8 @@ export function emptyStats(): ColonyStats {
 
   return {
     population: 0,
+    exportIncome: 0,
+    exporting: [],
     housing: 0,
     jobs: 0,
     workers: 0,
@@ -212,6 +238,8 @@ export function stepColony(
   let jobs = 0;
   let batteryCapacity = 0;
   let comfortBuildings = 0;
+  // Export terminals, counted with everything else rather than re-scanned.
+  let exportTerminals = 0;
 
   const active: PlacedBuilding[] = [];
   const completedTypes = new Set<BuildingId>();
@@ -226,6 +254,7 @@ export function stepColony(
     jobs += def.workers;
     if (building.type === 'battery') batteryCapacity += BATTERY_CAPACITY;
     if (building.type === 'atrium' || building.type === 'medical') comfortBuildings++;
+    if (building.type === 'exportpad') exportTerminals += upgradeTier(building.level).output;
   }
 
   const population = current.population;
@@ -306,6 +335,42 @@ export function stepColony(
         capacity[resource],
         stock[resource] + amount * scale * rate * outputScale(resource, mods) * dt,
       );
+    }
+  }
+
+  // ---- Export ------------------------------------------------------------
+  /*
+   * Selling surplus to Earth.
+   *
+   * This is where credits come from. Every terminal ships a fixed number of
+   * units per second, spent on the most valuable thing available - a colony
+   * with fuel to sell should always be shipping fuel rather than gravel.
+   *
+   * Only stock above `EXPORT_RESERVE` of capacity is eligible, so exporting
+   * can never starve the plant that produces the goods. That reserve is the
+   * difference between a trade and a leak.
+   */
+  const exportCapacity = exportTerminals * EXPORT_THROUGHPUT * efficiency;
+  let exportIncome = 0;
+  const exporting: ColonyStats['exporting'] = [];
+
+  if (exportCapacity > 0) {
+    let remaining = exportCapacity * dt;
+
+    for (const resource of EXPORTABLE) {
+      if (remaining <= 0) break;
+
+      const price = EXPORT_PRICE[resource] ?? 0;
+      const surplus = stock[resource] - EXPORT_RESERVE_UNITS;
+      if (surplus <= 0 || price <= 0) continue;
+
+      const shipped = Math.min(surplus, remaining);
+      stock[resource] -= shipped;
+      stock.money += shipped * price;
+
+      remaining -= shipped;
+      exportIncome += (shipped * price) / dt;
+      exporting.push({ resource, rate: shipped / dt, credits: (shipped * price) / dt });
     }
   }
 
@@ -411,6 +476,8 @@ export function stepColony(
     deaths,
     stats: {
       population: nextPopulation,
+      exportIncome,
+      exporting,
       housing,
       jobs,
       workers,
