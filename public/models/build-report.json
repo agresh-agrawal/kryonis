@@ -82,84 +82,14 @@
     ]
   },
   {
-    "source": "_kit/kit-04.glb",
-    "out": "kit-lab.glb",
-    "beforeMB": 0.1,
-    "afterMB": 0.13,
-    "beforeTris": 1710,
-    "afterTris": 1710,
+    "source": "astronaut-suit.glb",
+    "out": "astronaut.glb",
+    "beforeMB": 1.6,
+    "afterMB": 0.12,
+    "beforeTris": 9950,
+    "afterTris": 1596,
     "materials": [
-      "metal",
-      "glass",
-      "hull",
-      "dark"
-    ]
-  },
-  {
-    "source": "_kit/kit-05.glb",
-    "out": "kit-plant-a.glb",
-    "beforeMB": 0,
-    "afterMB": 0.08,
-    "beforeTris": 1088,
-    "afterTris": 1088,
-    "materials": [
-      "metal"
-    ]
-  },
-  {
-    "source": "_kit/kit-06.glb",
-    "out": "kit-plant-b.glb",
-    "beforeMB": 0,
-    "afterMB": 0.07,
-    "beforeTris": 1024,
-    "afterTris": 1024,
-    "materials": [
-      "metal"
-    ]
-  },
-  {
-    "source": "_kit/kit-07.glb",
-    "out": "kit-plant-c.glb",
-    "beforeMB": 0,
-    "afterMB": 0.07,
-    "beforeTris": 960,
-    "afterTris": 960,
-    "materials": [
-      "metal"
-    ]
-  },
-  {
-    "source": "_kit/kit-08.glb",
-    "out": "kit-tank.glb",
-    "beforeMB": 0,
-    "afterMB": 0.06,
-    "beforeTris": 772,
-    "afterTris": 772,
-    "materials": [
-      "metal"
-    ]
-  },
-  {
-    "source": "_kit/kit-09.glb",
-    "out": "kit-dish.glb",
-    "beforeMB": 0,
-    "afterMB": 0.04,
-    "beforeTris": 600,
-    "afterTris": 600,
-    "materials": [
-      "metal",
-      "glass"
-    ]
-  },
-  {
-    "source": "_kit/kit-10.glb",
-    "out": "kit-panel.glb",
-    "beforeMB": 0,
-    "afterMB": 0.01,
-    "beforeTris": 128,
-    "afterTris": 128,
-    "materials": [
-      "metal"
+      "hull"
     ]
   }
 ]

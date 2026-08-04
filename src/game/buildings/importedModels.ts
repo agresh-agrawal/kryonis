@@ -36,34 +36,52 @@ import type { BuildingId } from './catalog';
  * one that does not.
  */
 export const IMPORTED_MODELS: Partial<Record<BuildingId, string>> = {
+  // The three hero models, reviewed and kept.
   reactor: 'reactor.glb',
   factory: 'refinery.glb',
   spaceport: 'rocket.glb',
 
+  // The three large blocks recovered from the Mars colony diorama.
   habitat: 'kit-block-a.glb',
   atrium: 'kit-block-b.glb',
   lander: 'kit-block-c.glb',
-  lab: 'kit-lab.glb',
-
-  oxygen: 'kit-plant-a.glb',
-  water: 'kit-plant-b.glb',
-  fuelplant: 'kit-plant-c.glb',
-  storage: 'kit-tank.glb',
-
-  comms: 'kit-dish.glb',
-
-  /*
-   * Solar deliberately keeps its procedural model.
-   *
-   * `kit-panel.glb` is a single flat quad - 0.0 m thick - which vanishes when
-   * seen edge-on and z-fights against its own foundation pad. The generated
-   * solar array is purpose-built for this game, and with dozens of them on
-   * screen at once it is the one structure where the procedural version is
-   * clearly the better answer.
-   */
 };
 
+/*
+ * What was removed, and why it is not coming back.
+ *
+ * The gallery review rejected the small kit props - the lab, the three plant
+ * units, the tank and the dish. They were the weakest pieces in the diorama:
+ * near-identical featureless cylinders that read as placeholder next to the
+ * hero models, and worse than the procedural buildings they replaced.
+ *
+ * `kit-panel.glb` went earlier for a harder reason - it is a single quad with
+ * no thickness, which vanishes edge-on and z-fights its own foundation pad.
+ *
+ * Everything not listed above now uses a purpose-built procedural model. That
+ * is the better default: geometry authored for this game, at this camera
+ * distance, in this palette, with detail where the player actually looks.
+ */
+
 const MODEL_PATH = '/models/';
+
+/**
+ * Models that are not buildings.
+ *
+ * Loaded by the same preload pass, keyed by name rather than by `BuildingId`.
+ */
+export const PROP_MODELS = {
+  astronaut: 'astronaut.glb',
+} as const;
+
+export type PropId = keyof typeof PROP_MODELS;
+
+const loadedProps = new Map<PropId, BuildingModel>();
+
+/** The imported geometry for a non-building prop, if it loaded. */
+export function getImportedProp(id: PropId): BuildingModel | undefined {
+  return loadedProps.get(id);
+}
 
 /** Populated by `preloadImportedModels`; empty until then. */
 const loaded = new Map<BuildingId, BuildingModel>();
@@ -151,28 +169,36 @@ export function preloadImportedModels(): Promise<void> {
 
   preloadPromise = (async () => {
     const loader = new GLTFLoader();
-    const entries = Object.entries(IMPORTED_MODELS) as [BuildingId, string][];
 
-    await Promise.all(
-      entries.map(async ([id, file]) => {
-        try {
-          const gltf = await loader.loadAsync(`${MODEL_PATH}${file}`);
-          const model = extractModel(gltf.scene);
+    const load = async (file: string): Promise<BuildingModel | null> => {
+      try {
+        const gltf = await loader.loadAsync(`${MODEL_PATH}${file}`);
+        const model = extractModel(gltf.scene);
 
-          // An empty result means the file loaded but contained nothing we
-          // recognised - worse than a failure, because it would render an
-          // invisible building. Treat it as a miss.
-          if (Object.keys(model).length === 0) {
-            console.warn(`[models] ${file} contained no "mat_*" meshes; using procedural model`);
-            return;
-          }
-
-          loaded.set(id, model);
-        } catch (error) {
-          console.warn(`[models] failed to load ${file}:`, error);
+        // An empty result means the file loaded but contained nothing we
+        // recognised - worse than a failure, because it would render an
+        // invisible building. Treat it as a miss.
+        if (Object.keys(model).length === 0) {
+          console.warn(`[models] ${file} contained no "mat_*" meshes; using procedural model`);
+          return null;
         }
+        return model;
+      } catch (error) {
+        console.warn(`[models] failed to load ${file}:`, error);
+        return null;
+      }
+    };
+
+    await Promise.all([
+      ...(Object.entries(IMPORTED_MODELS) as [BuildingId, string][]).map(async ([id, file]) => {
+        const model = await load(file);
+        if (model) loaded.set(id, model);
       }),
-    );
+      ...(Object.entries(PROP_MODELS) as [PropId, string][]).map(async ([id, file]) => {
+        const model = await load(file);
+        if (model) loadedProps.set(id, model);
+      }),
+    ]);
   })();
 
   return preloadPromise;

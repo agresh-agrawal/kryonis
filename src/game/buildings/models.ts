@@ -11,6 +11,17 @@
 import * as THREE from 'three';
 
 import {
+  boltRow,
+  controlPanel,
+  crates,
+  crops,
+  deckRail,
+  handrail,
+  ladder,
+  pipeRun,
+  ventGrille,
+} from './detailKit';
+import {
   accentBand,
   airlock,
   antenna,
@@ -254,27 +265,92 @@ export function iceExtractorParts(): Part[] {
   return parts;
 }
 
+/**
+ * The greenhouse.
+ *
+ * The one building in the colony that is supposed to look *alive*, and the one
+ * that most obviously did not: three green boxes on three trays, which read as
+ * slabs of paint under glass.
+ *
+ * What is here now is a real growing house — raised beds of dark soil with
+ * individually generated crops standing in them, lamp bars over each row,
+ * irrigation running along the bed edges, and a service walkway down the
+ * middle with a rail. The plants are the point; everything else exists to
+ * explain how they are being kept alive nine months from Earth.
+ */
 export function greenhouseParts(): Part[] {
   const parts: Part[] = [...foundation(5.6, 3.6)];
 
-  // Glazed barrel vault.
+  // --- Shell -------------------------------------------------------------
   parts.push({ geo: vault(1.45, 5.0, 24), mat: 'glass', pos: [0, 0.2, 0] });
+
   // Structural ribs over the glazing.
-  for (let i = 0; i < 6; i++) {
-    const x = -2.3 + i * 0.92;
-    parts.push({ geo: torus(1.46, 0.055, 20), mat: 'metal', pos: [x, 0.2, 0], rot: [0, Math.PI / 2, 0] });
-  }
-  // End walls.
-  for (const x of [-2.52, 2.52]) {
-    parts.push({ geo: cylinder(1.45, 0.08, 20), mat: 'hull', pos: [x, 0.2, 0], rot: [0, 0, Math.PI / 2] });
+  for (let i = 0; i < 7; i++) {
+    const x = -2.4 + i * 0.8;
+    parts.push({
+      geo: torus(1.46, 0.052, 20),
+      mat: 'metal',
+      pos: [x, 0.2, 0],
+      rot: [0, Math.PI / 2, 0],
+    });
   }
 
-  // Planting beds and grow lights.
-  for (const z of [-0.72, 0, 0.72]) {
-    parts.push({ geo: box(4.5, 0.34, 0.5), mat: 'soil', pos: [0, 0.38, z] });
-    parts.push({ geo: box(4.5, 0.06, 0.55), mat: 'metal', pos: [0, 0.22, z] });
+  // Ridge beam along the top of the vault.
+  parts.push({ geo: box(5.0, 0.09, 0.12), mat: 'metal', pos: [0, 1.63, 0] });
+
+  // End walls, with a vent in the far one — a sealed glasshouse cooks.
+  for (const x of [-2.52, 2.52]) {
+    parts.push({
+      geo: cylinder(1.45, 0.08, 20),
+      mat: 'hull',
+      pos: [x, 0.2, 0],
+      rot: [0, 0, Math.PI / 2],
+    });
   }
-  parts.push({ geo: box(4.6, 0.07, 0.16), mat: 'window', pos: [0, 1.3, 0] });
+  parts.push(...ventGrille([-2.58, 1.0, 0], 0.7, 0.44, Math.PI / 2));
+
+  // --- Growing beds ------------------------------------------------------
+  const bedZ = [-0.78, 0, 0.78];
+  bedZ.forEach((z, index) => {
+    // Raised planter: walls, then soil sunk inside them, so the bed reads as a
+    // container of earth rather than a painted block.
+    parts.push({ geo: box(4.6, 0.3, 0.62), mat: 'metal', pos: [0, 0.34, z] });
+    parts.push({ geo: box(4.44, 0.22, 0.48), mat: 'soil', pos: [0, 0.42, z] });
+
+    // The crop itself. A different seed per bed so no two rows match, and the
+    // middle bed is planted denser because it gets the most light.
+    parts.push(
+      ...crops([0, 0.52, z], 4.3, 0.44, 4100 + index * 137, index === 1 ? 1.15 : 1),
+    );
+
+    // Irrigation line along the bed edge, with drippers.
+    parts.push({ geo: cylinder(0.03, 4.4, 6), mat: 'metal', pos: [0, 0.5, z - 0.3], rot: [0, 0, Math.PI / 2] });
+
+    // Lamp bar above the row: housing plus the lit element.
+    parts.push({ geo: box(4.3, 0.1, 0.16), mat: 'dark', pos: [0, 1.32, z] });
+    parts.push({ geo: box(4.16, 0.05, 0.1), mat: 'window', pos: [0, 1.27, z] });
+
+    // Hangers holding the lamp bar off the ridge.
+    for (const x of [-1.6, 0, 1.6]) {
+      parts.push({ geo: cylinder(0.014, 0.3, 5), mat: 'metal', pos: [x, 1.47, z] });
+    }
+  });
+
+  // --- Working hardware --------------------------------------------------
+  // Service walkway between the beds, with a rail on one side only — the other
+  // side is where you reach in to pick.
+  parts.push({ geo: box(4.6, 0.04, 0.34), mat: 'concrete', pos: [0, 0.2, 0.39] });
+  parts.push(...handrail([-2.2, 0.22, 0.39], [2.2, 0.22, 0.39], 0.36));
+
+  // Nutrient tanks and the pipework feeding the beds.
+  parts.push({ geo: cylinder(0.24, 0.72, 12), mat: 'hull', pos: [-1.95, 0.56, -1.28] });
+  parts.push({ geo: cylinder(0.24, 0.72, 12), mat: 'hull', pos: [-1.42, 0.56, -1.28] });
+  parts.push(...pipeRun([-1.95, 0.9, -1.28], [-1.95, 0.5, -0.78], 0.045));
+  parts.push(...pipeRun([-1.42, 0.9, -1.28], [-1.42, 0.5, -0.78], 0.045));
+
+  // Climate console by the door: this is a controlled environment, and somebody
+  // controls it.
+  parts.push(...controlPanel([2.28, 0.95, -0.62], Math.PI / 2, 0.9));
 
   parts.push(...airlock([2.9, 0.6, 0], Math.PI / 2, 1.0, 0.42));
   return parts;

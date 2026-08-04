@@ -34,7 +34,9 @@ export type MaterialKey =
   | 'accent'
   | 'hazard'
   | 'concrete'
-  | 'soil';
+  | 'soil'
+  | 'foliage'
+  | 'foliageDeep';
 
 /** Emissive intensity of interior lighting during the day vs. at night. */
 const WINDOW_DAY = 0.05;
@@ -181,17 +183,48 @@ export class MaterialLibrary {
         metalness: 0,
       }),
 
-      // Planting beds inside greenhouses - the only green on the planet, and
-      // the one surface that should read as loose and broken up rather than
-      // moulded.
+      /*
+       * Growing medium in the planting beds.
+       *
+       * This used to be green, which is why greenhouse beds read as slabs of
+       * green paint: the *soil* was the plant. Soil is dark, damp and brown -
+       * on Mars it is washed regolith with compost worked through it - and the
+       * green belongs on the leaves above it, where the two can read as
+       * separate things.
+       */
       soil: new THREE.MeshStandardMaterial({
-        color: '#4a7a3a',
+        color: '#3a2b20',
         normalMap: detailNormal,
-        normalScale: new THREE.Vector2(0.7, 0.7),
-        roughness: 0.9,
+        normalScale: new THREE.Vector2(0.9, 0.9),
+        roughness: 1,
         metalness: 0,
-        emissive: new THREE.Color('#183d14'),
-        emissiveIntensity: 0.2,
+      }),
+
+      /*
+       * Crop foliage. Two tones, because one flat green is the single fastest
+       * way to make a plant look plastic.
+       *
+       * Lit slightly from within: leaves under grow lamps are backlit, and a
+       * touch of emissive is a cheaper and more controllable way to suggest
+       * that than a real translucency model.
+       */
+      foliage: new THREE.MeshStandardMaterial({
+        color: '#6f9c46',
+        roughness: 0.78,
+        metalness: 0,
+        emissive: new THREE.Color('#24401a'),
+        emissiveIntensity: 0.16,
+        side: THREE.DoubleSide,
+      }),
+
+      // The shadowed inner leaves, and the darker crops.
+      foliageDeep: new THREE.MeshStandardMaterial({
+        color: '#3f6b2c',
+        roughness: 0.85,
+        metalness: 0,
+        emissive: new THREE.Color('#16290f'),
+        emissiveIntensity: 0.12,
+        side: THREE.DoubleSide,
       }),
     };
   }
@@ -241,4 +274,6 @@ export const MATERIAL_KEYS = Object.keys({
   hazard: 0,
   concrete: 0,
   soil: 0,
+  foliage: 0,
+  foliageDeep: 0,
 } satisfies Record<MaterialKey, number>) as MaterialKey[];

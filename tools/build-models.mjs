@@ -136,7 +136,7 @@ function computeBounds(document) {
  * Applied to the accessors rather than to a node transform, because the runtime
  * merges these geometries and a node transform would be lost in the merge.
  */
-function normalise(document, targetFootprint, targetHeight) {
+function normalise(document, targetFootprint, targetHeight, rotateY = 0) {
   const { min, max } = computeBounds(document);
   if (!Number.isFinite(min[0])) return null;
 
@@ -154,6 +154,8 @@ function normalise(document, targetFootprint, targetHeight) {
 
   const centreX = (min[0] + max[0]) / 2;
   const centreZ = (min[2] + max[2]) / 2;
+  const cos = Math.cos(rotateY);
+  const sin = Math.sin(rotateY);
 
   for (const mesh of document.getRoot().listMeshes()) {
     for (const prim of mesh.listPrimitives()) {
@@ -162,10 +164,13 @@ function normalise(document, targetFootprint, targetHeight) {
       const element = [0, 0, 0];
       for (let i = 0; i < position.getCount(); i++) {
         position.getElement(i, element);
+        // Centre, scale, then yaw about the vertical axis.
+        const x = (element[0] - centreX) * scale;
+        const z = (element[2] - centreZ) * scale;
         position.setElement(i, [
-          (element[0] - centreX) * scale,
+          x * cos + z * sin,
           (element[1] - min[1]) * scale, // base to y = 0
-          (element[2] - centreZ) * scale,
+          -x * sin + z * cos,
         ]);
       }
     }
@@ -180,13 +185,13 @@ function normalise(document, targetFootprint, targetHeight) {
  * Primitives are re-parented onto new meshes named `mat_<key>`; the runtime
  * reads those names and needs to know nothing else about the file.
  */
-function groupByMaterialKey(document) {
+function groupByMaterialKey(document, forceMaterial = null) {
   const root = document.getRoot();
   const buckets = new Map();
 
   for (const mesh of root.listMeshes()) {
     for (const prim of mesh.listPrimitives()) {
-      const key = classifyMaterial(prim.getMaterial());
+      const key = forceMaterial ?? classifyMaterial(prim.getMaterial());
       if (!buckets.has(key)) buckets.set(key, []);
       buckets.get(key).push(prim);
       mesh.removePrimitive(prim);
@@ -272,21 +277,37 @@ const TARGETS = [
    * its proportions and confirmed in the /models gallery. Sizes here are the
    * catalog footprints they are assigned to, not the sizes they arrived at.
    */
-  // Large modules - habitat-sized blocks, 5-7 m across.
+  // Large modules - habitat-sized blocks, 5-7 m across. These three survived
+  // the gallery review; the smaller kit props did not and were deleted.
   { source: '_kit/kit-01.glb', out: 'kit-block-a.glb', footprint: 5.6, height: 4.6, maxTriangles: 3000 },
   { source: '_kit/kit-02.glb', out: 'kit-block-b.glb', footprint: 5.6, height: 4.6, maxTriangles: 3000 },
   { source: '_kit/kit-03.glb', out: 'kit-block-c.glb', footprint: 5.6, height: 4.6, maxTriangles: 2500 },
-  { source: '_kit/kit-04.glb', out: 'kit-lab.glb', footprint: 5.6, height: 4.6, maxTriangles: 2000 },
 
-  // Small units - tank/plant sized, ~2.5 m across.
-  { source: '_kit/kit-05.glb', out: 'kit-plant-a.glb', footprint: 3.6, height: 4.2, maxTriangles: 1500 },
-  { source: '_kit/kit-06.glb', out: 'kit-plant-b.glb', footprint: 3.6, height: 4.2, maxTriangles: 1500 },
-  { source: '_kit/kit-07.glb', out: 'kit-plant-c.glb', footprint: 3.6, height: 4.2, maxTriangles: 1500 },
-  { source: '_kit/kit-08.glb', out: 'kit-tank.glb', footprint: 3.6, height: 3.8, maxTriangles: 1200 },
-
-  // Flat pieces - dish and panel.
-  { source: '_kit/kit-09.glb', out: 'kit-dish.glb', footprint: 3.6, height: 2.0, maxTriangles: 1000 },
-  { source: '_kit/kit-10.glb', out: 'kit-panel.glb', footprint: 3.6, height: 2.2, maxTriangles: 500 },
+  /*
+   * The crew.
+   *
+   * Footprint is set deliberately large so the height cap wins the fit: a
+   * person is defined by being 1.8 m tall, not by how wide they are.
+   *
+   * The triangle budget is low because this is the most-instanced geometry in
+   * the game - up to 240 of them - and because the skeleton is stripped on the
+   * way through. That is not a limitation being worked around, it is the
+   * requirement: skinned meshes cannot be instanced, and an earlier rigged
+   * character dropped the crew cap from 240 to 14.
+   */
+  {
+    source: 'astronaut-suit.glb',
+    out: 'astronaut.glb',
+    footprint: 6,
+    height: 1.78,
+    maxTriangles: 1600,
+    // The source is a single textured material, so nothing can be separated
+    // out of it by classification. Forcing the whole body to the white suit
+    // material is the honest answer: the visor and backpack are then added as
+    // procedural parts on top, where they can be given their own materials and
+    // made to read at forty pixels tall.
+    forceMaterial: 'hull',
+  },
 ];
 
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
@@ -350,7 +371,7 @@ for (const target of TARGETS) {
   }
   await document.transform(prune(), dedup());
 
-  const counts = groupByMaterialKey(document);
+  const counts = groupByMaterialKey(document, target.forceMaterial ?? null);
   await document.transform(dedup(), prune());
 
   const primitiveCount = document
@@ -369,7 +390,7 @@ for (const target of TARGETS) {
    * its original size no matter what ratio was requested. Scaling everything to
    * real metres first makes one tolerance correct for all of them.
    */
-  const fitted = normalise(document, target.footprint, target.height);
+  const fitted = normalise(document, target.footprint, target.height, target.rotateY ?? 0);
 
   const mergedTris = trianglesOf(document);
   if (mergedTris > target.maxTriangles) {

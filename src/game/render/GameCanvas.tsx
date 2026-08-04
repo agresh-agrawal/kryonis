@@ -6,6 +6,7 @@ import * as THREE from 'three';
 
 import { invalidateModelCache } from '../buildings/catalog';
 import { preloadImportedModels } from '../buildings/importedModels';
+import { useAssetStore } from '../state/useAssetStore';
 import { useQuality, useSettingsStore } from '../state/useSettingsStore';
 import { Scene } from './Scene';
 
@@ -45,7 +46,10 @@ export function GameCanvas() {
   useEffect(() => {
     let cancelled = false;
     preloadImportedModels().then(() => {
-      if (!cancelled) invalidateModelCache();
+      if (cancelled) return;
+      invalidateModelCache();
+      // Wakes anything that memoised geometry before the models arrived.
+      useAssetStore.getState().markReady();
     });
     return () => {
       cancelled = true;

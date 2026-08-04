@@ -4,8 +4,19 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
 import type { QualitySettings } from '../core/quality';
-import { buildModel, capsule, cylinder, unitSphere, type Part } from '../buildings/model';
+import { getImportedProp } from '../buildings/importedModels';
+import {
+  buildModel,
+  capsule,
+  cylinder,
+  unitSphere,
+  type BuildingModel,
+  type Part,
+} from '../buildings/model';
+import { useAssetStore } from '../state/useAssetStore';
 import { useColonyStore } from '../state/useColonyStore';
 import { dayFraction, useTimeStore } from '../state/useTimeStore';
 import type { TerrainData } from '../world/terrain';
@@ -45,6 +56,36 @@ function suitParts(): Part[] {
 }
 
 /**
+ * The hardware bolted onto the imported suit.
+ *
+ * The downloaded astronaut is a single textured material, so nothing can be
+ * separated out of it - it arrives as one white body with no visor and no
+ * backpack. Those are added here instead, which is the better arrangement
+ * anyway: the imported mesh supplies an anatomically correct silhouette, and
+ * these three parts supply the things that actually have to read at forty
+ * pixels tall, in materials chosen for that job.
+ *
+ * Positions are in metres on a 1.78 m figure whose feet are at y = 0.
+ */
+function suitFittings(): Part[] {
+  return [
+    // Life-support pack, sitting between the shoulder blades.
+    { geo: capsule(0.12, 0.16), mat: 'metal', pos: [0, 1.28, -0.16], rot: [0, 0, Math.PI / 2] },
+    { geo: cylinder(0.045, 0.3, 6), mat: 'metal', pos: [-0.09, 1.3, -0.22] },
+    { geo: cylinder(0.045, 0.3, 6), mat: 'metal', pos: [0.09, 1.3, -0.22] },
+
+    // Visor. The single most important surface on a colonist: it is dark
+    // against a white suit, it catches the sun, and it tells you which way
+    // somebody is facing from right across the crater.
+    { geo: unitSphere(), mat: 'window', pos: [0, 1.62, 0.055], scale: 0.098 },
+
+    // Neck ring, in the colony accent - a spot of warm colour at head height
+    // that separates helmet from shoulders in silhouette.
+    { geo: cylinder(0.125, 0.035, 10), mat: 'accent', pos: [0, 1.47, 0] },
+  ];
+}
+
+/**
  * Renders and drives the colony's people.
  *
  * Colonists are drawn as instanced geometry - one draw call per material for
@@ -70,7 +111,35 @@ export function ColonistsLayer({
   const paused = useTimeStore((state) => state.paused);
   const speed = useTimeStore((state) => state.speed);
 
-  const model = useMemo(() => buildModel(suitParts()), []);
+  /*
+   * The colonist mesh.
+   *
+   * Prefers the imported astronaut, which is a real human silhouette rather
+   * than a capsule with cylinders for limbs. It is safe to instance because the
+   * asset pipeline discards the skeleton on the way through - what arrives here
+   * is a static posed mesh, which is exactly what the instanced path needs.
+   *
+   * The visor, backpack and neck ring are merged on top of it either way; on
+   * the procedural fallback they are already part of `suitParts`.
+   */
+  const assetVersion = useAssetStore((state) => state.version);
+
+  const model = useMemo(() => {
+    const imported = getImportedProp('astronaut');
+    if (!imported?.hull) return buildModel(suitParts());
+
+    const fittings = buildModel(suitFittings());
+    const merged: BuildingModel = { ...fittings };
+
+    // The suit body joins whatever the fittings already put in `hull`.
+    const body = imported.hull.clone();
+    merged.hull = fittings.hull
+      ? (mergeGeometries([body, fittings.hull], false) ?? body)
+      : body;
+
+    return merged;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetVersion]);
 
   // Four flat materials, no textures at all: two fragment samplers total once
   // the shadow map is counted, which no GPU is going to object to.
