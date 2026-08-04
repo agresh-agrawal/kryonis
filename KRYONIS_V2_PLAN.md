@@ -1,145 +1,123 @@
 # KRYONIS — Version 2 Plan
 
-V1 (milestones M1–M8) is complete and playable. V2 is the pass that makes it
-*feel* finished: nothing unreadable, nothing floating, nothing that opens into
-an empty rail, and enough content that a colony has somewhere to go.
+V1 (M1–M8) is complete. **Pass 1 is done** and so is the asset import. This
+document now describes **Pass 2**, and records the decisions behind Pass 1 so
+they are not re-litigated.
 
-Reference display for all layout work: **1920×1080 fullscreen**. Everything must
-still degrade sanely down to ~1280 wide, but 1080p is what gets tuned.
+Reference display: **1920×1080 fullscreen**.
 
-Decisions taken before starting (do not re-litigate):
+---
 
-| Question | Decision |
+## Where things stand
+
+### Done — Pass 1
+
+| Area | Result |
 |---|---|
-| 250 MB trailer | Ship as-is. Mitigated by loading the world *behind* it and an instant skip. |
-| Which screens go full-screen | Crew, Research, Territory, Codex. Directives + inspector stay as edge panels. |
-| Reference resolution | 1920×1080 fullscreen. |
-| Order of work | Fix-first (Pass 1), then new content (Pass 2). |
+| Consoles | Crew, Research, Territory, Codex, Objectives are full-screen. Territory previously opened nothing at all. |
+| Research | A project that costs points up front and then *takes time*, so the assigned crew lead matters. |
+| Doctrine | Chosen at landing; changes starting stock, build speed, research cost, life-support draw. |
+| Persistence | Save v3. Resumes straight into the colony. Settings persist separately. Three scoped resets. |
+| Readability | `--color-faint` / `--color-titanium` lifted above 4.5:1. Locked states use shape + words, never opacity. |
+| Time | 0.5× / 1× / 3×. |
+| Trailer | Plays when a colony is **founded**, not on first page visit. |
+| Copy | Plain English throughout — "Keep the Lights On", not "Establish Generation". |
+
+### Done — assets
+
+168 MB of downloaded models became **3.8 MB across 7 files**. Six buildings and
+one astronaut survived review:
+
+| Model | Used for |
+|---|---|
+| `reactor.glb` | Fission Reactor |
+| `refinery.glb` | Fabrication Plant |
+| `rocket.glb` | Spaceport |
+| `kit-block-a/b/c.glb` | Habitat Dome, Recreation Atrium, Command Lander |
+| `astronaut.glb` | Every colonist |
+
+The smaller kit props were rejected in gallery review as featureless
+placeholder cylinders and deleted. Everything else uses purpose-built
+procedural geometry, which is the better default: authored for this camera
+distance, in this palette, with detail where the player actually looks.
+
+### Done — model detail
+
+Every procedural building now carries working hardware from `detailKit.ts`:
+control panels with buttons, handrails, ladders, flanged pipe runs, louvred
+vents, bolt rows, crates. The greenhouse was rebuilt outright — it was three
+green boxes, because the *soil* material was green, so the soil was the plant.
+
+**Measured, not assumed:** `npx tsx tools/count-tris.mts` prints the triangle
+cost of every structure. Current total 86,784 across 18 structures; nothing
+over 8k.
 
 ---
 
-## Pass 1 — Everything that is broken, unreadable, or missing
+## Pass 2 — more structures
 
-### 1.1 Boot and first run
-- Trailer plays on **first run only**, before the new-colony screen.
-- The 3D world, terrain generation and texture bake all start **during** the
-  trailer, so the wait is not dead time. Entering the colony afterwards is
-  instant instead of a second stall.
-- Skip button available from the first frame, not after 1.8 s.
-- Buffering state is visible rather than a black rectangle.
-- Returning players get the short loading clip, not the trailer.
-- Settings gains **Replay intro**.
+The catalog is 18. Target is ~30, grouped so the build deck reads as real
+categories rather than one long shelf.
 
-### 1.2 New-colony flow (more questions, better UI)
-Currently one screen: corporation name + site. Becomes a short wizard:
-
-1. **Commander** — your name, used by the game when it addresses you.
-2. **Programme** — corporation name, and a mission doctrine that actually
-   changes starting conditions (see below).
-3. **Landing site** — the existing three surveyed sites, with the survey bars
-   kept because they are measured from real terrain.
-4. **Confirm** — a summary card, then descent.
-
-Doctrine is not flavour text; each sets starting stock, a standing modifier and
-one free research node:
-
-| Doctrine | Start | Ongoing |
+### 2.1 Industry
+| Structure | Footprint | Role |
 |---|---|---|
-| Scientific | Extra research points, fewer credits | Research costs less |
-| Industrial | Extra metal + credits | Construction is faster |
-| Sustainer | Extra water + food, larger crew | Life support drains slower |
+| Smelter | 3×2 | Ore → refined metal. The missing step between mine and factory. |
+| Polymer Plant | 2×2 | Carbon → plastics and seals. Feeds habitat construction. |
+| Parts Fabricator | 2×2 | Metal → components. Consumed by upgrades. |
+| Ore Sorter | 2×2 | Raises mine yield rather than producing anything itself. |
 
-### 1.3 Time controls
-Replace 1× / 2× / 4× with **0.5× / 1× / 3×**, plus pause. Four states total:
-stop, slow, normal, fast — matching the request exactly. Keyboard: `Space`
-pause, `1` `2` `3` for the speeds.
+### 2.2 Logistics
+| Structure | Footprint | Role |
+|---|---|---|
+| Rover Garage | 3×2 | Spawns a rover that drives between structures. Pure life. |
+| Cargo Pad | 3×3 | Landing point for Earth supply; pairs with the spaceport. |
+| Pipeline Node | 1×1 | Links storage to consumers; reduces transfer loss. |
+| Depot | 3×2 | Bulk storage, cheaper per unit than tanks. |
 
-### 1.4 Full-screen consoles
-A shared `Console` shell: full-viewport, world hidden behind it, its own header
-with title/subtitle/close, `Esc` to exit, and a slow radar sweep in the
-background so it reads as an instrument rather than a web page.
+### 2.3 Habitation
+| Structure | Footprint | Role |
+|---|---|---|
+| Crew Quarters II | 3×3 | Denser housing, unlocked by Habitat Ergonomics. |
+| Canteen | 2×2 | Converts raw food into morale. |
+| Recreation Dome | 3×3 | Morale at scale; the reason a big colony stays happy. |
+| Infirmary Wing | 2×2 | Extends the medical bay. |
 
-- **Crew console** — roster as cards, capacity from habitats, hire by skill,
-  assign to research. Detailed in 1.5.
-- **Research console** — branch columns, node detail, assigned researcher,
-  progress over time. Detailed in 1.6.
-- **Territory console** — the thing that currently opens nothing. A top-down
-  claim map of the crater: claimed ring, next ring, cost, what each ring
-  contains (ice, ore, buildable fraction).
-- **Codex console** — readable entries with locked ones clearly marked
-  *Undiscovered* rather than dimmed into illegibility.
+### 2.4 Support
+| Structure | Footprint | Role |
+|---|---|---|
+| Radiator Field | 2×2 | Sheds heat; required by the reactor at higher tiers. |
+| Dust Filtration | 2×2 | Cuts the dust-storm penalty. |
+| Comms Relay II | 2×2 | Faster research, longer contracts. |
 
-### 1.5 Crew, in full
-- Capacity comes from built habitation. 4 crew at start; a Habitat Dome adds
-  places; you may only hire into a vacancy.
-- Hiring: choose the **skill** you want. Cost rises with roster size and varies
-  by skill.
-- Each member has a skill, a rank, and a morale/fatigue state.
-- Assign a member to **lead research** — their skill affinity and rank cut the
-  cost and raise the rate of matching branches.
-- Named colonists in the roster correspond to the agents walking around.
-
-### 1.6 Research, in full
-- Research stops being an instant purchase. A project is **started**, then
-  progresses per sol at a rate set by the assigned researcher and by how many
-  labs you have running.
-- Prerequisites shown honestly: a locked node says which node unlocks it.
-- Locked/undiscovered nodes are legible — outlined and labelled, not 55% opacity.
-
-### 1.7 Readability
-- Audit every `text-faint` / `opacity-55` / micro-type use against the 1080p
-  reference. Minimum contrast for body copy raised.
-- Locked, undiscovered and disabled states get an explicit visual language
-  (outline + label) instead of "make it dimmer".
-
-### 1.8 World and render fixes
-- **Floating structures.** Buildings are seated at the highest corner of their
-  footprint, so downhill corners hang in the air. Add a regolith skirt/plinth
-  that fills to the lowest corner — physically what a real pad would be.
-- **Untextured surfaces.** Audit every material in the library for a colour map;
-  anything flat-shaded gets one, within the 16-sampler budget.
-- Boulders and scatter checked for the same seating problem.
-
-### 1.9 Persistence
-- Save schema v3: adds crew detail, research-in-progress, doctrine, commander
-  name, time speed, camera position, settings.
-- **Settings persist** across sessions (currently they do not).
-- Reset is expanded: *Reset world* (new colony), *Reset settings*, *Reset
-  everything including the intro flag*.
-
-### 1.10 Objectives / overview
-Overview becomes a real screen: current directive, what it wants, what it pays,
-and a short "what should I do next" line derived from the actual colony state.
+### 2.5 Deck grouping
+Categories become: Habitation · Power · Life Support · Industry · Logistics ·
+Science · Support. Each card already shows a real render, baked from the actual
+model by `ThumbnailBaker`.
 
 ---
 
-## Pass 2 — Content and depth
+## Pass 3 — candidates, not committed
 
-### 2.1 More structures
-Target ~30 total, grouped so the build deck reads as categories:
-
-- **Industry** — smelter, polymer plant, parts fabricator, ore refinery.
-- **Logistics** — depot, pipeline node, rover garage, cargo pad.
-- **Habitation** — crew quarters tier 2, medical bay, canteen, recreation dome.
-- **Support** — radiator field, dust filtration, comms relay upgrade.
-
-### 2.2 Map
-Minimap becomes accurate: real terrain colours, real deposits, real building
-positions, claimed-ring overlay, click to move the camera.
-
-### 2.3 Models
-Swap procedural geometry for downloaded GLB models as they arrive. Wiring point
-is `buildParts()` in `src/game/buildings/catalog.ts`. See
-`KRYONIS_ASSET_SHOPPING_LIST.md` for what to fetch and the hard constraints.
+- **Minimap** — real deposits, click-to-move camera.
+- **Rover movement** — a vehicle that actually drives between structures.
+- **Trade/Exchange** — greyed in the dock since V1.
+- **Terrain → Web Worker.** Generation is a 1–2 s main-thread stall, currently
+  hidden behind the intro video rather than fixed. Still the largest single
+  perf win available.
 
 ---
 
 ## Constraints that still apply
 
-- **16 fragment samplers.** Every material stays well under. No second WebGL
-  context, ever.
-- **Colonists must stay instanceable** — no skinned/rigged characters in the
-  crowd. Rigged models are fine for a portrait or a single hero prop.
-- Nothing in the centre of the viewport during play. Consoles are the exception,
+- **16 fragment samplers.** No second WebGL context. The thumbnail baker
+  borrows the game's renderer precisely because an earlier attempt at previews
+  made its own context and broke shader compilation.
+- **Colonists must stay instanceable.** The imported astronaut works only
+  because the pipeline strips its skeleton. A skinned character drops the crew
+  cap from 240 to 14.
+- **Never put `:` or `.` in a glTF node name** you intend to read back —
+  three's loader strips them, and the failure is silent.
+- Nothing in the centre of the viewport during play; consoles are the exception
   because they deliberately replace the world.
 - Plain English, never chemical notation.
