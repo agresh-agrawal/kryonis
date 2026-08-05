@@ -45,11 +45,19 @@ import {
   weld,
 } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import { flattenAndBake, trianglesOf } from './lib-gltf.mjs';
 
+/*
+ * Sources are read in place rather than copied into the working folder.
+ *
+ * Two models used to be duplicated here - a 30 MB tower and a 1.5 MB astronaut -
+ * purely so the paths were shorter. That is 32 MB of the same bytes twice, and
+ * a second copy that silently goes stale the moment the original is replaced.
+ */
 const SOURCE_DIR = 'Models i have added self';
 const OUT_DIR = 'public/models';
 
@@ -272,7 +280,7 @@ const TARGETS = [
    * palette like every other import.
    */
   {
-    source: 'watchtower.glb',
+    source: '../scifi-watchtower-es/source/tripo_pbr_model_b0518ac6-c8ca-44aa-bdac-632469f0c8f9.glb',
     out: 'hub-tower.glb',
     footprint: 7.2,
     height: 10.5,
@@ -316,7 +324,7 @@ const TARGETS = [
    * character dropped the crew cap from 240 to 14.
    */
   {
-    source: 'astronaut-suit.glb',
+    source: '../_archive/models/astronaut-on-suit.glb',
     out: 'astronaut.glb',
     footprint: 6,
     height: 1.78,
@@ -334,6 +342,26 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 await MeshoptSimplifier.ready;
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
+
+/*
+ * The diorama is split on demand.
+ *
+ * `_kit/` holds the props recovered from mars_colony.glb, and three targets
+ * below read from it. It used to be a folder you had to remember to generate by
+ * running another script first - so deleting it as "an intermediate" silently
+ * broke the build with a SKIP rather than an error. Regenerating it here makes
+ * the pipeline one command with no hidden prerequisite.
+ */
+{
+  const kitDir = path.join(SOURCE_DIR, '_kit');
+  const diorama = path.join(SOURCE_DIR, 'mars_colony.glb');
+  if (!fs.existsSync(kitDir) && fs.existsSync(diorama)) {
+    console.log('_kit/ missing - splitting the diorama first');
+    execFileSync(process.execPath, ['tools/split-kit.mjs', diorama, kitDir, '1.6'], {
+      stdio: ['ignore', 'ignore', 'inherit'],
+    });
+  }
+}
 
 const report = [];
 

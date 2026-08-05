@@ -384,12 +384,53 @@ body {
  * user to browser-zoom out to see all HUD elements. Instead of asking for zoom,
  * scale the HUD slightly based on the viewport so it fits at 100% browser zoom.
  */
+/*
+ * HUD scaling.
+ *
+ * The reference size is what decides whether the interface renders at 100%.
+ * It used to be 1200x900, and 900 is taller than any real browser viewport on
+ * a 1080p screen - once tabs, address bar and bookmarks are taken off the top
+ * you are left with about 810 pixels, so the HUD was permanently drawn at
+ * 810/900 = 90% and never once appeared at full size on the machine it was
+ * designed for.
+ *
+ * The reference is now 1150x700, which every ordinary desktop window clears, so
+ * the scale sits at exactly 1. Shrinking only starts below that - and because
+ * the panels underneath scroll rather than overflow, it is a last resort rather
+ * than the normal case.
+ */
 @utility hud-scale {
-  --hud-scale: clamp(0.8, min(calc(100vw / 1200), calc(100dvh / 900)), 1);
+  --hud-scale: clamp(0.78, min(calc(100vw / 1150), calc(100dvh / 700)), 1);
   width: calc(100% / var(--hud-scale));
   height: calc(100% / var(--hud-scale));
   transform: scale(var(--hud-scale));
   transform-origin: top left;
+}
+
+/*
+ * A scrollbar inside a HUD panel.
+ *
+ * Thin enough not to compete with the world behind it, but with a visible
+ * thumb - `quiet-scroll` is so faint that a panel with more content below the
+ * fold looks like a panel that simply ends, and the player never scrolls it.
+ */
+.rail-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--color-dust) 55%, transparent) transparent;
+}
+.rail-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.rail-scroll::-webkit-scrollbar-track {
+  background: rgb(255 255 255 / 0.04);
+  border-radius: 4px;
+}
+.rail-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--color-dust) 55%, transparent);
+  border-radius: 4px;
+}
+.rail-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-dust);
 }
 
 @media (prefers-reduced-motion: reduce) {

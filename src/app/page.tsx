@@ -246,7 +246,7 @@ export default function Page() {
           than pinned to opposite corners - pinning is what let the map ride up
           over the dock and bury the notice chip once the viewport got short.
         */}
-        <div className="absolute bottom-3 left-3 top-20 flex w-[3.5rem] flex-col items-start justify-between gap-2 min-[1180px]:bottom-4 min-[1180px]:left-4 min-[1180px]:top-24 min-[1180px]:w-44 min-[1180px]:gap-3">
+        <div className="rail-scroll absolute bottom-3 left-3 top-20 flex w-[3.5rem] flex-col items-start justify-between gap-2 overflow-y-auto overflow-x-hidden min-[1180px]:bottom-4 min-[1180px]:left-4 min-[1180px]:top-24 min-[1180px]:w-44 min-[1180px]:gap-3">
           <Dock active={section} onSelect={setSection} />
           <div className="flex flex-col items-start gap-2.5">
             <Notifications />
@@ -263,7 +263,7 @@ export default function Page() {
           height-capped so it can never reach the build deck either.
         */}
         <div
-          className="quiet-scroll absolute right-3 top-28 flex max-h-[calc(100dvh-10rem)] w-[min(17.5rem,calc(100vw-5rem))] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-0.5 min-[1180px]:right-4 min-[1180px]:top-36 min-[1180px]:max-h-[calc(100dvh-18rem)]"
+          className="rail-scroll absolute right-3 top-28 flex max-h-[calc(100dvh-9rem)] w-[min(17.5rem,calc(100vw-5rem))] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-1.5 min-[1180px]:right-4 min-[1180px]:top-32 min-[1180px]:max-h-[calc(100dvh-13rem)]"
         >
           <TerritoryChip onOpen={() => setSection('territory')} />
           <RoadChip />

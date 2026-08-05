@@ -1,6 +1,6 @@
 [
   {
-    "source": "watchtower.glb",
+    "source": "../scifi-watchtower-es/source/tripo_pbr_model_b0518ac6-c8ca-44aa-bdac-632469f0c8f9.glb",
     "out": "hub-tower.glb",
     "beforeMB": 31.8,
     "afterMB": 1.15,
@@ -93,7 +93,7 @@
     ]
   },
   {
-    "source": "astronaut-suit.glb",
+    "source": "../_archive/models/astronaut-on-suit.glb",
     "out": "astronaut.glb",
     "beforeMB": 1.6,
     "afterMB": 0.12,
