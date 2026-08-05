@@ -39,9 +39,20 @@ export function PostFX({ quality }: { quality: QualitySettings }) {
   // torn down and rebuilt (hot reload, a lost context, a quality change), and a
   // cached "the context was fine once" answer is exactly how the composer ends
   // up constructing itself against a dead one.
+  /*
+   * Check the exact call postprocessing makes, not a proxy for it.
+   *
+   * This used to test `gl.getContext() != null`, which is not the same
+   * question and let the crash through: a lost context still returns a
+   * non-null object from `getContext()`, but `getContextAttributes()` on it
+   * returns null - and that is the call whose `.alpha` postprocessing reads.
+   * The guard passed, the composer was built anyway, and the canvas went down
+   * with "Cannot read properties of null (reading 'alpha')".
+   */
   let contextAlive = false;
   try {
-    contextAlive = gl.getContext() != null;
+    const context = gl.getContext();
+    contextAlive = context != null && context.getContextAttributes() != null;
   } catch {
     contextAlive = false;
   }

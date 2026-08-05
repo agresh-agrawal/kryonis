@@ -43,6 +43,25 @@ const TARGETS = [
     crf: 19,
     audioKbps: 160,
   },
+  {
+    /*
+     * The short loading clip.
+     *
+     * Both videos are built from source rather than committed. Binary media in
+     * git is a trap - the repository reached 646 MB before any rule excluded it,
+     * and every version of every file stays in the pack forever. Running this
+     * script is the reproducible way to get them back.
+     */
+    source: 'KRYONIS_game_loading_screen_anim…_202608031742.mp4',
+    out: 'kryonis-loading.mp4',
+    // 720p at a modest quality: this plays behind a title card for a couple of
+    // seconds, loops, and is never looked at closely. Encoding it like the
+    // trailer made it *larger* than the source - quality settings are chosen
+    // per job, not applied uniformly.
+    height: 720,
+    crf: 28,
+    audioKbps: 64,
+  },
 ];
 
 function run(args) {
