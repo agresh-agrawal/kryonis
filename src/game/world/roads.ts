@@ -337,3 +337,48 @@ export function serviceProblem(building: PlacedBuilding): string | null {
   if (needsWater(type) && !state.hasWater) return 'No water on this road';
   return null;
 }
+
+/**
+ * Where a structure's gate meets the walkway.
+ *
+ * Every structure has one gate, and it should be visibly plumbed into the
+ * network rather than merely standing next to it. This finds the road tile the
+ * structure actually touches and returns the short run between the two, which
+ * the renderer draws as a connecting tunnel.
+ *
+ * Returns null when the structure is not touching a walkway at all - in which
+ * case there is nothing to draw, and the inspector is already saying so.
+ */
+export function gateConnection(
+  building: PlacedBuilding,
+): { from: [number, number]; to: [number, number] } | null {
+  if (isExempt(building.type)) return null;
+
+  const [w, d] = rotatedFootprint(building.type, building.rotation);
+
+  // Walk the perimeter ring and take the first road tile found. Deterministic
+  // order means the tunnel does not jump to a different side of the building
+  // when an unrelated road is laid elsewhere.
+  for (let dz = -1; dz <= d; dz++) {
+    for (let dx = -1; dx <= w; dx++) {
+      const inside = dx >= 0 && dx < w && dz >= 0 && dz < d;
+      if (inside) continue;
+      const isCorner = (dx === -1 || dx === w) && (dz === -1 || dz === d);
+      if (isCorner) continue;
+
+      const tx = building.tx + dx;
+      const tz = building.tz + dz;
+      if (!hasRoad(tx, tz)) continue;
+
+      // From the footprint edge nearest that tile, to the tile centre.
+      const edgeX = Math.min(Math.max(tx, building.tx), building.tx + w - 1);
+      const edgeZ = Math.min(Math.max(tz, building.tz), building.tz + d - 1);
+
+      const [fx, fz] = tileCentre(edgeX, edgeZ);
+      const [tox, toz] = tileCentre(tx, tz);
+      return { from: [fx, fz], to: [tox, toz] };
+    }
+  }
+
+  return null;
+}

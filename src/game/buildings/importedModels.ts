@@ -41,8 +41,15 @@ export const IMPORTED_MODELS: Partial<Record<BuildingId, string>> = {
   factory: 'refinery.glb',
   spaceport: 'rocket.glb',
 
-  // The three large blocks recovered from the Mars colony diorama.
-  habitat: 'kit-block-a.glb',
+  /*
+   * Blocks recovered from the Mars colony diorama.
+   *
+   * The habitat is deliberately NOT one of them any more. It is the structure
+   * a player builds most often and lives in, so it earns purpose-built
+   * geometry - a geodesic shell in a regolith berm with a real airlock
+   * vestibule - rather than a featureless block that happened to be the right
+   * size.
+   */
   atrium: 'kit-block-b.glb',
 
   /*

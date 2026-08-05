@@ -107,44 +107,135 @@ export function landerParts(): Part[] {
 // Habitation
 // ---------------------------------------------------------------------------
 
+/**
+ * The Habitat Dome.
+ *
+ * This is where colonists live, it is the structure a player builds most often
+ * after solar, and it was the weakest thing on the map - a plain hemisphere on
+ * a cone with eight beads stuck round it for windows.
+ *
+ * What is here now is built the way a real pressure vessel is: a geodesic shell
+ * of triangulated panels on a ring beam, sunk into a regolith berm that is
+ * doing a job rather than decorating one. Two metres of Martian dirt is the
+ * cheapest radiation shielding available and it is why every serious habitat
+ * concept is half-buried, so the berm is thick, it climbs the shell, and the
+ * dome sits *down* in it.
+ *
+ * The rest is the hardware that makes it a place people live in: a proper
+ * airlock vestibule with its own hatch and status light, a deck and rail around
+ * the upper level, radiators on the sunward side, an environmental console by
+ * the door, and a docking collar so a walkway can tunnel straight into it.
+ */
 export function habitatParts(): Part[] {
-  const parts: Part[] = [...foundation(5.4, 5.4)];
+  const parts: Part[] = [...foundation(5.8, 5.8)];
 
-  // Regolith berm piled against the shell - the cheapest radiation shielding
-  // available on Mars, and the reason real habitat concepts are half-buried.
-  parts.push({ geo: taperedCylinder(2.55, 3.0, 0.85, 24), mat: 'concrete', pos: [0, 0.6, 0] });
-  parts.push({ geo: box(3.8, 0.2, 3.8), mat: 'soil', pos: [0, 0.3, 0] });
+  const R = 2.55;
 
-  parts.push({ geo: pressureDome(2.4, 28), mat: 'hull', pos: [0, 0.95, 0] });
-  parts.push({ geo: torus(2.4, 0.07, 24), mat: 'metal', pos: [0, 1.0, 0], rot: [Math.PI / 2, 0, 0] });
-  parts.push(...accentBand([0, 1.55, 0], 2.22));
+  // --- Regolith berm -----------------------------------------------------
+  // Piled against the shell, not a skirt under it: it should read as the dome
+  // being dug into the ground.
+  parts.push({ geo: taperedCylinder(2.75, 3.35, 1.05, 28), mat: 'concrete', pos: [0, 0.62, 0] });
+  parts.push({ geo: torus(2.9, 0.22, 24), mat: 'concrete', pos: [0, 0.95, 0], rot: [Math.PI / 2, 0, 0] });
 
-  // Viewports ringing the pressurised shell.
-  const ports: Part[] = [];
+  // --- Pressure shell ----------------------------------------------------
+  parts.push({ geo: dome(R, 24), mat: 'hull', pos: [0, 1.02, 0] });
+
+  /*
+   * Panel ribs.
+   *
+   * Meridian ribs plus two latitude hoops turn a smooth ball into a shell
+   * assembled from panels, which is the single biggest difference between
+   * "sphere primitive" and "pressure vessel". The meridians stop short of the
+   * pole so they do not all pile into one point.
+   */
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
-    ports.push({
-      geo: unitSphere(),
-      mat: 'window',
-      pos: [Math.cos(angle) * 2.3, 1.5, Math.sin(angle) * 2.3],
-      scale: 0.2,
+    parts.push({
+      geo: torus(R + 0.02, 0.032, 14),
+      mat: 'metal',
+      pos: [0, 1.02, 0],
+      rot: [0, angle, Math.PI / 2],
     });
   }
-  parts.push(...ports);
+  for (const [height, scale] of [
+    [0.55, 0.94],
+    [1.35, 0.72],
+    [2.0, 0.42],
+  ] as const) {
+    parts.push({
+      geo: torus(R * scale, 0.04, 18),
+      mat: 'metal',
+      pos: [0, 1.02 + height, 0],
+      rot: [Math.PI / 2, 0, 0],
+    });
+  }
 
-  parts.push(...airlock([0, 1.15, 2.75], 0, 1.3, 0.5));
-  parts.push(...antenna([1.7, 1.9, -1.7], 1.6, false));
+  // Ring beam where the shell meets the berm - the load path made visible.
+  parts.push({ geo: torus(R + 0.06, 0.09, 20), mat: 'metal', pos: [0, 1.06, 0], rot: [Math.PI / 2, 0, 0] });
 
-  // Roof-mounted life-support trunk.
-  parts.push({ geo: cylinder(0.28, 0.7, 10), mat: 'metal', pos: [0, 3.4, 0] });
-  parts.push({ geo: box(0.7, 0.12, 0.7), mat: 'metal', pos: [0, 3.82, 0] });
-  parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0, 3.85, 0], scale: 0.12 });
+  // --- Windows -----------------------------------------------------------
+  // Set into the shell in a band at eye height, not scattered over it, and
+  // recessed behind their own frames.
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2 + Math.PI / 16;
+    const ringRadius = R * 0.93;
+    const x = Math.cos(angle) * ringRadius;
+    const z = Math.sin(angle) * ringRadius;
+    parts.push({
+      geo: box(0.52, 0.4, 0.12),
+      mat: 'window',
+      pos: [x, 1.72, z],
+      rot: [0, -angle + Math.PI / 2, 0],
+    });
+    parts.push({
+      geo: box(0.6, 0.48, 0.06),
+      mat: 'metal',
+      pos: [x * 1.03, 1.72, z * 1.03],
+      rot: [0, -angle + Math.PI / 2, 0],
+    });
+  }
 
-  // Service walkways to make the habitat feel built rather than dropped.
-  parts.push({ geo: box(1.15, 0.08, 0.35), mat: 'metal', pos: [1.7, 0.15, 0] });
-  parts.push(...handrail([1.25, 0.18, -0.2], [2.15, 0.18, -0.2], 0.32));
-  parts.push({ geo: box(1.15, 0.08, 0.35), mat: 'metal', pos: [-1.7, 0.15, 0] });
-  parts.push(...handrail([-2.15, 0.18, -0.2], [-1.25, 0.18, -0.2], 0.32));
+  // --- Airlock vestibule --------------------------------------------------
+  // A room you pass through, with its own roof and hatch, rather than a door
+  // painted on the side of the dome.
+  parts.push({ geo: box(1.5, 1.25, 1.35), mat: 'hull', pos: [0, 0.82, 3.0] });
+  parts.push({ geo: box(1.62, 0.1, 1.45), mat: 'metal', pos: [0, 1.48, 3.0] });
+  parts.push({ geo: cylinder(0.46, 0.14, 18), mat: 'metal', pos: [0, 0.86, 3.7], rot: [Math.PI / 2, 0, 0] });
+  parts.push({ geo: cylinder(0.34, 0.08, 16), mat: 'window', pos: [0, 0.86, 3.78], rot: [Math.PI / 2, 0, 0] });
+  // Cycle light: green means you may go through.
+  parts.push({ geo: unitSphere(), mat: 'accent', pos: [0.62, 1.32, 3.62], scale: 0.075 });
+  parts.push(...boltRow([-0.7, 1.5, 3.0], [0.7, 1.5, 3.0], 5, 0.02));
+
+  // Steps up to the hatch, and a rail beside them.
+  parts.push({ geo: box(1.1, 0.06, 0.34), mat: 'concrete', pos: [0, 0.24, 4.0] });
+  parts.push({ geo: box(1.1, 0.06, 0.34), mat: 'concrete', pos: [0, 0.36, 3.78] });
+  parts.push(...handrail([-0.6, 0.28, 4.15], [-0.6, 0.28, 3.55], 0.44));
+  parts.push(...handrail([0.6, 0.28, 4.15], [0.6, 0.28, 3.55], 0.44));
+
+  // --- Docking collar -----------------------------------------------------
+  // Where a pressurised walkway ties in. Every structure has exactly one gate,
+  // and this is the habitat's.
+  parts.push({ geo: cylinder(0.82, 0.5, 18), mat: 'hull', pos: [0, 0.9, 2.35], rot: [Math.PI / 2, 0, 0] });
+  parts.push({ geo: torus(0.84, 0.07, 18), mat: 'metal', pos: [0, 0.9, 2.6], rot: [0, 0, 0] });
+
+  // --- Upper service deck -------------------------------------------------
+  parts.push({ geo: cylinder(1.05, 0.07, 18), mat: 'metal', pos: [0, 2.62, 0] });
+  parts.push(...deckRail(1.85, 1.85, 2.66, 0.4));
+  parts.push(...ladder([0, 1.06, 2.28], 1.6, 0));
+
+  // Life-support trunk and the radiators that go with it.
+  parts.push({ geo: cylinder(0.3, 0.75, 12), mat: 'metal', pos: [0, 3.0, 0] });
+  parts.push({ geo: dome(0.32, 12), mat: 'hull', pos: [0, 3.36, 0] });
+  parts.push(...radiator([1.95, 1.5, -1.6], 1.15, 1.0, -0.85));
+  parts.push(...radiator([-1.95, 1.5, -1.6], 1.15, 1.0, 0.85));
+
+  // --- Working detail -----------------------------------------------------
+  parts.push(...controlPanel([1.05, 0.95, 2.55], 0.35, 0.85));
+  parts.push(...ventGrille([-1.5, 0.75, 2.35], 0.55, 0.36, 0.4));
+  parts.push(...pipeRun([-1.2, 1.15, 2.1], [-1.9, 1.15, 1.2], 0.055));
+  parts.push(...crates([2.0, 0.2, 2.1], 4242, 2));
+
+  parts.push({ geo: unitSphere(), mat: 'hazard', pos: [0, 3.62, 0], scale: 0.11 });
 
   return parts;
 }

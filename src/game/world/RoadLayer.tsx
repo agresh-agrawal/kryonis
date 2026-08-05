@@ -5,35 +5,45 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import { REGION_TILES, TILE_SIZE, WORLD_HALF } from '../core/constants';
+import { TILE_SIZE, WORLD_HALF } from '../core/constants';
 import { useRoadStore } from '../state/useRoadStore';
-import { hasRoad, networkAt, roadGrid, tileUtilities } from './roads';
+import { networkAt, roadGrid, tileUtilities } from './roads';
+import {
+  ARCH_RADIUS,
+  DECK_LIFT,
+  archStub,
+  connectionsOf,
+  deckQuad,
+  ductStub,
+  forEachRoadTile,
+  isStraightThrough,
+  tileWorld,
+  type Direction,
+} from './walkwayGeometry';
 import type { TerrainData } from './terrain';
 
 /**
  * The colony's pressurised walkways.
  *
- * These are not roads in the tarmac sense and they should not look like one.
- * Nobody strolls across Mars in shirtsleeves: the way people move between
- * sectors is a sealed tube with air in it, and that is what these are - a
- * glazed arch over a walking deck, with the power and water runs carried in
- * the service duct beneath the floor where a real installation would put them.
+ * Nobody crosses Mars in shirtsleeves, so what joins two sectors is a sealed
+ * tube with air in it: a glazed arch over a walking deck, with the power and
+ * water runs in the service duct beneath the floor where a real installation
+ * would put them.
  *
- * The wiring is deliberately **hidden until asked for**. A colony with every
- * conduit glowing all the time is a Christmas tree, and the one moment a player
- * actually wants to see cabling is when they are working out why a sector is
- * dark. So the ducts are dim and unlit normally, and the utility overlay - or
- * selecting a walkway - lights them up and makes the tube glass go transparent
- * so you can see straight through to them.
+ * Every tile is built from *stubs* - a half-length tube from the tile centre to
+ * each neighbour it connects to - rather than one tube per axis. That single
+ * change is what makes corners, T-junctions and crossroads all work: they are
+ * just tiles with two non-collinear, three, or four stubs, and each gets a
+ * collar at the centre where the stubs meet.
+ *
+ * The wiring is hidden until asked for. A colony with every conduit glowing is
+ * a Christmas tree, and the one moment anybody wants to see cabling is when
+ * they are working out why a sector is dark. The overlay lights the live ducts
+ * and fades the glass so you can see through to them.
  */
 
-/** Height of the walking deck above the ground. */
-const DECK_HEIGHT = 0.08;
-/** Radius of the pressurised arch. */
-const ARCH_RADIUS = 0.78;
-/** How far the conduits sit either side of the centre line, under the deck. */
-const DUCT_OFFSET = 0.42;
-const DUCT_RADIUS = 0.06;
+const DUCT_OFFSET = 0.44;
+const DUCT_RADIUS = 0.062;
 
 export function RoadLayer({ terrain }: { terrain: TerrainData }) {
   const version = useRoadStore((state) => state.version);
@@ -42,108 +52,80 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
   const glassRef = useRef<THREE.MeshStandardMaterial>(null);
   const powerRef = useRef<THREE.MeshStandardMaterial>(null);
   const waterRef = useRef<THREE.MeshStandardMaterial>(null);
+  const stripRef = useRef<THREE.MeshStandardMaterial>(null);
 
-  /*
-   * Rebuilt whenever the grid changes rather than patched incrementally.
-   *
-   * A colony tops out at a few hundred walkway tiles, so a full rebuild is a
-   * couple of milliseconds and only happens when the player lays or removes
-   * one. Incremental patching would be faster and would be the wrong trade:
-   * far more state to keep correct, for time nobody was spending.
-   */
   const geometry = useMemo(() => {
     const decks: THREE.BufferGeometry[] = [];
-    const arches: THREE.BufferGeometry[] = [];
-    const ribs: THREE.BufferGeometry[] = [];
+    const glass: THREE.BufferGeometry[] = [];
+    const frames: THREE.BufferGeometry[] = [];
+    const strips: THREE.BufferGeometry[] = [];
     const poweredDucts: THREE.BufferGeometry[] = [];
-    const deadPowerDucts: THREE.BufferGeometry[] = [];
+    const deadPower: THREE.BufferGeometry[] = [];
     const wateredDucts: THREE.BufferGeometry[] = [];
-    const deadWaterDucts: THREE.BufferGeometry[] = [];
+    const deadWater: THREE.BufferGeometry[] = [];
 
-    for (let index = 0; index < roadGrid.length; index++) {
-      if (roadGrid[index] !== 1) continue;
+    forEachRoadTile(roadGrid, (tx, tz) => {
+      const [cx, cz] = tileWorld(tx, tz);
+      const cy = terrain.generator.heightAt(cx, cz) + DECK_LIFT;
 
-      const tx = index % REGION_TILES;
-      const tz = (index / REGION_TILES) | 0;
-      const x = (tx + 0.5) * TILE_SIZE - WORLD_HALF;
-      const z = (tz + 0.5) * TILE_SIZE - WORLD_HALF;
-      const y = terrain.generator.heightAt(x, z);
-
-      const east = hasRoad(tx + 1, tz);
-      const west = hasRoad(tx - 1, tz);
-      const north = hasRoad(tx, tz - 1);
-      const south = hasRoad(tx, tz + 1);
-
-      const runsX = east || west;
-      const runsZ = north || south;
-      // A lone tile still gets an axis, or a single piece would be a bare slab.
-      const axes: ('x' | 'z')[] = [];
-      if (runsX) axes.push('x');
-      if (runsZ) axes.push('z');
-      if (axes.length === 0) axes.push('x');
-
-      // --- Walking deck ---------------------------------------------------
-      const deck = new THREE.BoxGeometry(TILE_SIZE * 1.02, 0.07, TILE_SIZE * 1.02);
-      deck.translate(x, y + DECK_HEIGHT, z);
-      decks.push(deck);
+      let connections = connectionsOf(tx, tz);
+      // A lone tile still gets a run, or a single piece would be a bare slab.
+      if (connections.length === 0) connections = ['px', 'nx'] as Direction[];
 
       const { power, water } = tileUtilities(tx, tz);
 
-      for (const axis of axes) {
-        // --- Pressurised arch ---------------------------------------------
-        // An open half-cylinder, so from a low camera you see into the tube
-        // rather than at a sealed lozenge.
-        const arch = new THREE.CylinderGeometry(
-          ARCH_RADIUS,
-          ARCH_RADIUS,
-          TILE_SIZE * 1.02,
-          14,
-          1,
-          true,
-          0,
-          Math.PI,
-        );
-        arch.rotateZ(Math.PI / 2);
-        if (axis === 'z') arch.rotateY(Math.PI / 2);
-        arch.translate(x, y + DECK_HEIGHT, z);
-        arches.push(arch);
+      // --- Deck, on shared corner heights so neighbours never step ---------
+      decks.push(deckQuad(terrain, tx, tz));
 
-        // Structural hoops at each end of the tile, so a run reads as a
-        // sequence of frames rather than an extruded pipe.
-        for (const end of [-0.5, 0.5]) {
-          const hoop = new THREE.TorusGeometry(ARCH_RADIUS, 0.035, 6, 14, Math.PI);
-          hoop.rotateZ(Math.PI);
-          if (axis === 'x') {
-            hoop.rotateY(Math.PI / 2);
-            hoop.translate(x + end * TILE_SIZE, y + DECK_HEIGHT, z);
-          } else {
-            hoop.translate(x, y + DECK_HEIGHT, z + end * TILE_SIZE);
-          }
-          ribs.push(hoop);
-        }
+      for (const dir of connections) {
+        // --- Pressurised shell --------------------------------------------
+        glass.push(archStub(terrain, tx, tz, dir, ARCH_RADIUS, 0));
 
-        // --- Service ducts under the deck ----------------------------------
-        for (const [offset, live, deadList, liveList] of [
-          [-DUCT_OFFSET, power, deadPowerDucts, poweredDucts] as const,
-          [DUCT_OFFSET, water, deadWaterDucts, wateredDucts] as const,
-        ]) {
-          const duct = new THREE.CylinderGeometry(
-            DUCT_RADIUS,
-            DUCT_RADIUS,
-            TILE_SIZE * 1.02,
-            6,
-          );
-          if (axis === 'x') {
-            duct.rotateZ(Math.PI / 2);
-            duct.translate(x, y + DECK_HEIGHT - 0.05, z + offset);
-          } else {
-            duct.rotateX(Math.PI / 2);
-            duct.translate(x + offset, y + DECK_HEIGHT - 0.05, z);
-          }
-          (live ? liveList : deadList).push(duct);
-        }
+        // Structural frame just outside the glass, so a run reads as a series
+        // of ribs rather than an extruded pipe.
+        frames.push(archStub(terrain, tx, tz, dir, ARCH_RADIUS + 0.045, 0));
+
+        // --- Floor strip lighting ------------------------------------------
+        // The detail that makes a tube read as somewhere people walk at night.
+        strips.push(ductStub(terrain, tx, tz, dir, 0, 0.028));
+
+        // --- Service ducts --------------------------------------------------
+        const powerDuct = ductStub(terrain, tx, tz, dir, -DUCT_OFFSET, DUCT_RADIUS);
+        (power ? poweredDucts : deadPower).push(powerDuct);
+
+        const waterDuct = ductStub(terrain, tx, tz, dir, DUCT_OFFSET, DUCT_RADIUS);
+        (water ? wateredDucts : deadWater).push(waterDuct);
       }
-    }
+
+      /*
+       * A collar where the stubs meet.
+       *
+       * On a straight run the stubs are collinear and a collar would just be a
+       * bulge, so it is skipped. Anywhere the run turns or divides, the collar
+       * is what makes the junction read as a deliberate node rather than two
+       * tubes that happen to intersect.
+       */
+      if (!isStraightThrough(connections)) {
+        const collar = new THREE.SphereGeometry(
+          ARCH_RADIUS + 0.05,
+          14,
+          8,
+          0,
+          Math.PI * 2,
+          0,
+          Math.PI / 2,
+        );
+        collar.translate(cx, cy, cz);
+        frames.push(collar);
+
+        // A junction is also where an airlock would be, so it gets a ring.
+        const ring = new THREE.TorusGeometry(ARCH_RADIUS + 0.06, 0.05, 6, 18, Math.PI);
+        ring.rotateX(-Math.PI / 2);
+        ring.rotateZ(Math.PI);
+        ring.translate(cx, cy + 0.02, cz);
+        frames.push(ring);
+      }
+    });
 
     const merge = (list: THREE.BufferGeometry[]) => {
       if (list.length === 0) return null;
@@ -154,12 +136,13 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
 
     return {
       deck: merge(decks),
-      arch: merge(arches),
-      ribs: merge(ribs),
+      glass: merge(glass),
+      frames: merge(frames),
+      strips: merge(strips),
       powered: merge(poweredDucts),
-      deadPower: merge(deadPowerDucts),
+      deadPower: merge(deadPower),
       watered: merge(wateredDucts),
-      deadWater: merge(deadWaterDucts),
+      deadWater: merge(deadWater),
     };
     // `version` is the signal that the grid changed; the grid is not reactive.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,58 +155,67 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
   }, [geometry]);
 
   /*
-   * Inspection mode.
-   *
-   * Turning the overlay on does two things at once, and both are necessary:
-   * the glass loses most of its opacity so the ducts underneath become
-   * visible, and the live ducts light up. Either alone would be half an
-   * answer - glowing cable you cannot see through to is no help, and clear
-   * glass over dark cable tells you nothing about which run is carrying.
+   * Inspection mode does two things at once, and both are necessary: the glass
+   * loses most of its opacity so the ducts underneath become visible, and the
+   * live ducts light up. Either alone is half an answer.
    */
   useFrame(({ clock }) => {
     const pulse = 0.7 + Math.sin(clock.elapsedTime * 1.8) * 0.3;
 
     if (glassRef.current) {
-      const target = showUtilities ? 0.12 : 0.34;
+      const target = showUtilities ? 0.1 : 0.3;
       glassRef.current.opacity += (target - glassRef.current.opacity) * 0.12;
     }
-    if (powerRef.current) {
-      powerRef.current.emissiveIntensity = showUtilities ? pulse * 2.4 : 0.25;
-    }
-    if (waterRef.current) {
-      waterRef.current.emissiveIntensity = showUtilities ? pulse * 2.0 : 0.2;
-    }
+    if (powerRef.current) powerRef.current.emissiveIntensity = showUtilities ? pulse * 2.4 : 0.3;
+    if (waterRef.current) waterRef.current.emissiveIntensity = showUtilities ? pulse * 2.0 : 0.25;
+    // Floor strips stay lit but dim at night, like real emergency lighting.
+    if (stripRef.current) stripRef.current.emissiveIntensity = 0.9 + pulse * 0.2;
   });
 
   if (!geometry.deck) return null;
 
   return (
     <group name="walkways">
-      {/* Walking deck: sintered regolith, the surface people actually stand on. */}
       <mesh geometry={geometry.deck} receiveShadow>
-        <meshStandardMaterial color="#6b5c4e" roughness={0.92} metalness={0.02} />
+        <meshStandardMaterial
+          color="#6d5e50"
+          roughness={0.92}
+          metalness={0.02}
+          side={THREE.DoubleSide}
+        />
       </mesh>
 
-      {/* Structural hoops. */}
-      {geometry.ribs ? (
-        <mesh geometry={geometry.ribs} castShadow>
-          <meshStandardMaterial color="#b9c3cc" roughness={0.42} metalness={0.75} />
+      {geometry.strips ? (
+        <mesh geometry={geometry.strips}>
+          <meshStandardMaterial
+            ref={stripRef}
+            color="#ffd9a8"
+            emissive="#ffc078"
+            emissiveIntensity={1}
+            roughness={0.3}
+          />
         </mesh>
       ) : null}
 
-      {/*
-        The pressurised shell.
-        Double-sided because it is an open half-cylinder and the camera spends
-        most of its time looking down into it.
-      */}
-      {geometry.arch ? (
-        <mesh geometry={geometry.arch}>
+      {geometry.frames ? (
+        <mesh geometry={geometry.frames} castShadow>
+          <meshStandardMaterial
+            color="#b9c3cc"
+            roughness={0.42}
+            metalness={0.72}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ) : null}
+
+      {geometry.glass ? (
+        <mesh geometry={geometry.glass}>
           <meshStandardMaterial
             ref={glassRef}
             color="#9fd4e0"
             transparent
-            opacity={0.34}
-            roughness={0.1}
+            opacity={0.3}
+            roughness={0.08}
             metalness={0.1}
             side={THREE.DoubleSide}
             depthWrite={false}
@@ -231,14 +223,13 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
         </mesh>
       ) : null}
 
-      {/* --- Service ducts: power (yellow), water (blue) ----------------- */}
       {geometry.powered ? (
         <mesh geometry={geometry.powered}>
           <meshStandardMaterial
             ref={powerRef}
             color="#f0c657"
             emissive="#f0c657"
-            emissiveIntensity={0.25}
+            emissiveIntensity={0.3}
             roughness={0.4}
             metalness={0.3}
           />
@@ -256,7 +247,7 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
             ref={waterRef}
             color="#4fa8e0"
             emissive="#4fa8e0"
-            emissiveIntensity={0.2}
+            emissiveIntensity={0.25}
             roughness={0.35}
             metalness={0.3}
           />
