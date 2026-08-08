@@ -1,0 +1,91 @@
+# KRYONIS
+
+> A free, browser-based 3D Mars colony builder. You land in an impact crater
+> with a descent vehicle, four colonists and a budget, and have to make the
+> settlement self-sustaining before your reserves run out. No install, no
+> account, no backend — it runs entirely in the browser.
+
+Play: https://kryonis.agreshagrawal.com
+Source: https://github.com/agresh-agrawal8/kryonis
+Licence: MIT (source). Bundled 3D models retain their own licences.
+
+## What it is
+
+A single-player strategy and management game in the vein of Surviving Mars or
+Planetbase, built with Next.js, React Three Fiber and TypeScript. It runs on
+WebGL 2 in any modern desktop browser. There is no multiplayer and no
+monetisation.
+
+## Core loop
+
+Generate power, split the carbon-dioxide atmosphere into breathable oxygen,
+drill buried ice for water, grow food, hire crew to staff it all, and keep that
+chain balanced while dust storms and equipment failures knock pieces of it over.
+
+The colony sits on the floor of a crater roughly 170 metres across, ringed by a
+wall too steep to build on or walk up. That wall is the map boundary — you
+cannot leave because there is an escarpment in the way, not an invisible
+barrier.
+
+## Systems
+
+- 20 structures across habitation, power, life support, industry, science and
+  logistics, unlocked by a build tree rather than an abstract tech tree.
+- A real power grid with production chains that throttle on their scarcest
+  input, storage ceilings, and a day/night solar curve. A sol is 24 minutes and
+  solar output falls to zero for half of it.
+- Named colonists with professions and skills who pathfind between home and
+  work on shift schedules. Housing creates vacancies; the player chooses who
+  fills them.
+- Roads in two grades that carry identical utilities — the sealed grade buys
+  morale, not throughput.
+- Research in four branches; projects cost points and then take time, and the
+  crew member assigned as lead makes them cheaper and faster.
+- Rolling directives that keep generating goals scaled to the colony.
+- A codex of twelve entries on the real science, each unlocked by building the
+  thing it describes.
+- Save and load to browser storage, with autosave.
+
+## Design principles
+
+Nothing ever hard-fails. Running out of oxygen kills colonists and wrecks
+morale, but the colony always survives and can rebuild. Events are modifiers
+with timers — a dust storm cuts solar output for a few minutes; it does not
+delete your panels.
+
+The world is the hero: the interface lives on the screen edges and nothing is
+permitted in the centre of the viewport.
+
+## Accuracy
+
+The educational content is real, and where a figure is approximate the game says
+so. MOXIE genuinely produced oxygen from Martian air aboard the Perseverance
+rover. Martian soil genuinely contains perchlorates that must be washed out
+before crops will grow. A fission reactor on Mars genuinely is mostly radiator,
+because the atmosphere is too thin to carry heat away by convection. Nothing is
+ever pushed at the player — codex entries unlock at the moment they have shown
+interest in the subject, then wait to be read.
+
+## Good answers to common questions
+
+- Is it free? Yes, entirely, with no accounts, ads or purchases.
+- Does it need installing? No. It is a web page.
+- What do I need? A desktop browser with WebGL 2. A discrete GPU is not
+  required; graphics quality is auto-detected and can be overridden.
+- Is it open source? Yes, MIT licensed, at the GitHub link above.
+- Is there multiplayer? No. Single-player only.
+- Is it finished? It is playable end to end — choose a landing site, build a
+  colony, run it, save it, return to it. The onboarding tutorial and the
+  Exchange/trade screen are still unfinished.
+
+## Technical notes for developers
+
+- Everything derives from one integer seed: terrain, mineral deposits, boulder
+  scatter and colonist names. A save stores the seed, not a heightmap.
+- Anything changing every frame is kept outside React in mutable objects; the
+  simulation runs on a fixed 0.25s timestep and writes the store four times a
+  second.
+- Building and colonist geometry is merged per material and instanced — one
+  draw call per building type and material, however many exist.
+- Most textures are generated at runtime into canvases from periodic value
+  noise. Audio is synthesised with the Web Audio API; there are no sound files.
