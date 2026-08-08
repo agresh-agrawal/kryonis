@@ -29,7 +29,56 @@ import {
   type ResourceStock,
 } from '../core/resources';
 import type { PlacedBuilding } from '../state/useColonyStore';
-import { serviceOf } from '../world/roads';
+import { currentNetworks, needsPower, serviceOf } from '../world/roads';
+import { roadMorale } from '../world/roadGrades';
+
+/**
+ * What is currently holding a structure back, if anything.
+ *
+ * One value, ordered from "not started" through "not connected" to "running":
+ * the first thing that is wrong is the only thing worth telling the player
+ * about, because fixing it is what reveals the next one.
+ */
+export type ActivityLimit =
+  | 'construction'
+  | 'disabled'
+  | 'road'
+  | 'power'
+  | 'water'
+  | 'input'
+  | 'crew'
+  | 'brownout'
+  | 'dark'
+  | 'none';
+
+export interface BuildingActivity {
+  /** 0-1, how hard it is actually running this tick. */
+  rate: number;
+  limit: ActivityLimit;
+  /** The feedstock that ran dry, when `limit` is `input`. */
+  resource?: ResourceId;
+}
+
+/**
+ * What every structure is doing right now, keyed by building id.
+ *
+ * Deliberately outside React and outside the store, like the occupancy grid:
+ * it is rewritten wholesale four times a second by the simulation and read on
+ * demand by whichever panel is open. Putting it in a store would re-render the
+ * entire HUD at the tick rate to service a card that may not even be visible.
+ *
+ * The simulation is the only writer, and it is the only place that knows the
+ * answer - which input ran out, whether the shortfall was crew or power - so
+ * deriving this in the interface afterwards would mean guessing.
+ */
+export const buildingActivity = new Map<string, BuildingActivity>();
+
+const IDLE_ACTIVITY: BuildingActivity = { rate: 0, limit: 'none' };
+
+/** What a structure is doing. Safe to call before the first tick. */
+export function activityOf(buildingId: string): BuildingActivity {
+  return buildingActivity.get(buildingId) ?? IDLE_ACTIVITY;
+}
 
 /** Per-colonist life support draw, per second. */
 export const LIFE_SUPPORT = {
@@ -84,6 +133,16 @@ export interface ColonyStats {
   powerSatisfaction: number;
   batteryCharge: number;
   batteryCapacity: number;
+
+  /**
+   * Finished structures that are switched on and still not running, because
+   * their road is missing or carrying nothing.
+   *
+   * On the stats object rather than derived in the interface because the
+   * simulation is the only thing that knows: it is the pass that already walks
+   * every building and asks the network what it delivers.
+   */
+  unserviced: number;
 
   /** Storage ceiling per resource. */
   capacity: ResourceStock;
@@ -189,6 +248,7 @@ export function emptyStats(): ColonyStats {
     powerSatisfaction: 1,
     batteryCharge: 0,
     batteryCapacity: 0,
+    unserviced: 0,
     capacity,
     rates: emptyStock(),
     alerts: [],
@@ -259,8 +319,23 @@ export function stepColony(
   const active: PlacedBuilding[] = [];
   const completedTypes = new Set<BuildingId>();
 
+  /*
+   * Structures standing but not running, so the colony can be told about them
+   * once rather than the player having to click every dark building in turn.
+   */
+  let unserviced = 0;
+
+  buildingActivity.clear();
+
   for (const building of buildings) {
-    if (building.progress < 1 || !building.enabled) continue;
+    if (building.progress < 1) {
+      buildingActivity.set(building.id, { rate: 0, limit: 'construction' });
+      continue;
+    }
+    if (!building.enabled) {
+      buildingActivity.set(building.id, { rate: 0, limit: 'disabled' });
+      continue;
+    }
 
     /*
      * A structure only runs if its road is delivering what it needs.
@@ -274,11 +349,29 @@ export function stepColony(
      *
      * An unserviced structure still counts as *built* - it keeps its housing,
      * which is a physical fact about it - but it produces nothing and draws no
-     * power, and `serviceProblem` tells the player exactly which of road,
-     * power or water is missing.
+     * power. Which of the three is missing is recorded below, so the inspector
+     * and the in-world badge can both name it.
      */
-    if (!serviceOf(building.id).operational) {
+    const service = serviceOf(building.id);
+    if (!service.operational) {
       housing += BUILDINGS[building.type].housing;
+      unserviced++;
+      /*
+       * Which of the three is missing, tested against what this structure
+       * actually needs rather than against what the grid happens to carry. A
+       * greenhouse on a grid with no generator and no extractor lacks both, but
+       * only water is its problem - it draws no power it cannot get from the
+       * global pool - and naming the wrong one sends the player to fix the
+       * wrong thing.
+       */
+      buildingActivity.set(building.id, {
+        rate: 0,
+        limit: !service.connected
+          ? 'road'
+          : needsPower(building.type) && !service.hasPower
+            ? 'power'
+            : 'water',
+      });
       continue;
     }
 
@@ -310,8 +403,19 @@ export function stepColony(
       // Solar tracks the sun; anything else runs flat out. Generation scales
       // with the output multiplier, since that is what the upgrade buys.
       const rated = def.power * tier.output;
-      powerProduction +=
-        building.type === 'solar' ? rated * solarFactor * mods.solar : rated;
+      if (building.type === 'solar') {
+        const sun = solarFactor * mods.solar;
+        powerProduction += rated * sun;
+        // A panel in the dark is not broken and the readout must not imply it
+        // is: night is the expected state for half of every sol.
+        buildingActivity.set(building.id, {
+          rate: Math.min(1, sun),
+          limit: solarFactor < 0.02 ? 'dark' : 'none',
+        });
+      } else {
+        powerProduction += rated;
+        buildingActivity.set(building.id, { rate: 1, limit: 'none' });
+      }
     } else {
       powerDemand += -def.power * tier.power * mods.powerDraw;
     }
@@ -360,20 +464,43 @@ export function stepColony(
      * above, where an unserviced building never reaches `active` in the first
      * place. It has no business being a global break.
      */
-    if (efficiency <= 0) break;
-
     // An upgraded plant processes more of everything, inputs included.
     const scale = upgradeTier(building.level).output;
 
     // A plant can only run as fast as its scarcest input allows.
     let rate = efficiency;
+    let starved: ResourceId | null = null;
     for (const [resource, amount] of Object.entries(def.input) as [ResourceId, number][]) {
       const needed = amount * scale * rate * dt;
       if (needed <= 0) continue;
       if (stock[resource] < needed) {
         rate *= needed > 0 ? stock[resource] / needed : 0;
+        starved = resource;
       }
     }
+
+    /*
+     * Record what this structure managed, and why it was not more.
+     *
+     * Generators already wrote their own record in the power pass above, so
+     * they are left alone here - a reactor's story is "producing 65 kW", not
+     * "ran at 100% of nothing".
+     */
+    if (def.power <= 0) {
+      buildingActivity.set(building.id, {
+        rate,
+        limit: starved
+          ? 'input'
+          : staffing < 0.999
+            ? 'crew'
+            : powerSatisfaction < 0.999
+              ? 'brownout'
+              : 'none',
+        resource: starved ?? undefined,
+      });
+    }
+
+    if (efficiency <= 0) continue;
     if (rate <= 0) continue;
 
     for (const [resource, amount] of Object.entries(def.input) as [ResourceId, number][]) {
@@ -459,7 +586,19 @@ export function stepColony(
   const comfortBonus = population > 0 ? Math.min(0.2, (comfortBuildings * 12) / population * 0.2) : 0;
   const crowding = housing > 0 ? Math.max(0, population - housing) / Math.max(1, housing) : 1;
 
-  let targetHappiness = 0.78 + comfortBonus + mods.morale - crowding * 0.4;
+  /*
+   * What the network is built of.
+   *
+   * A sealed transit way carries no more power and no more water than a graded
+   * service road - the difference is entirely that people can walk it without a
+   * suit. So it pays in morale and nowhere else, scaled by the share of the
+   * network that is sealed, which means the first sealed tile is worth exactly
+   * as much as the last and there is no threshold to hold out for.
+   */
+  const grid = currentNetworks();
+  const transitBonus = roadMorale(grid.sealedTiles, grid.tiles);
+
+  let targetHappiness = 0.78 + comfortBonus + transitBonus + mods.morale - crowding * 0.4;
   if (!hasOxygen) targetHappiness -= 0.55;
   if (!hasWater) targetHappiness -= 0.35;
   if (!hasFood) targetHappiness -= 0.3;
@@ -512,6 +651,24 @@ export function stepColony(
     });
   }
 
+  /*
+   * Structures standing but doing nothing.
+   *
+   * The single most expensive silence in the game: a player builds an oxygen
+   * plant, watches it finish, and nothing happens - because it is not touching
+   * a road. Said once here, with a count, and marked over each offender in the
+   * world so the message points somewhere.
+   */
+  if (unserviced > 0) {
+    alerts.push({
+      id: 'unserviced',
+      severity: 'warning',
+      message: `${unserviced} structure${unserviced === 1 ? '' : 's'} not connected — lay road to bring ${
+        unserviced === 1 ? 'it' : 'them'
+      } online`,
+    });
+  }
+
   if (jobs > population) {
     alerts.push({
       id: 'crew',
@@ -550,6 +707,7 @@ export function stepColony(
       powerSatisfaction,
       batteryCharge,
       batteryCapacity,
+      unserviced,
       capacity,
       rates,
       alerts,

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { AudioController } from '../audio/AudioController';
 import { BuildingsLayer } from '../buildings/BuildingsLayer';
+import { StatusMarkers } from '../buildings/StatusMarkers';
 import { ThumbnailBaker } from '../buildings/ThumbnailBaker';
 import { ColonistsLayer } from '../colonists/ColonistsLayer';
 import { BuildGrid } from '../build/BuildGrid';
@@ -67,6 +68,8 @@ export function Scene() {
       <ThumbnailBaker />
 
       <BuildingsLayer terrain={terrain} quality={quality} />
+      {/* Badges over anything standing but not running. Drawn over everything. */}
+      <StatusMarkers terrain={terrain} />
       <LandingSequence terrain={terrain} />
       <ColonistsLayer terrain={terrain} quality={quality} />
       <BuildGrid terrain={terrain} active={tool !== 'select'} />

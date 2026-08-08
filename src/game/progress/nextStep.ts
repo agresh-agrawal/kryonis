@@ -48,6 +48,24 @@ export function suggestNextStep(ctx: NextStepContext): NextStep {
     return { text: 'Out of food! Build a greenhouse now', tone: 'critical' };
   }
 
+  /*
+   * Then connection, above everything else the colony could build.
+   *
+   * A structure that is standing but not on a road produces nothing, so
+   * "put up a solar array" is actively wrong advice for a colony that already
+   * has one sitting dark ten metres off the network. Fixing what you own beats
+   * buying another of it, every time.
+   */
+  if (stats.unserviced > 0) {
+    return {
+      text:
+        stats.unserviced === 1
+          ? 'A structure is not connected — run road up to it'
+          : `${stats.unserviced} structures are not connected — run road up to them`,
+      tone: 'warn',
+    };
+  }
+
   // --- Then power, because it is what keeps life support running. ---------
   if (stats.powerProduction <= 0 && ctx.totalBuildings > 1) {
     return { text: 'No power at all — put up a solar array', tone: 'critical' };

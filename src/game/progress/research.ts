@@ -25,8 +25,19 @@ export type ResearchId =
   | 'ore-beneficiation'
   | 'autonomous-haulage'
   | 'habitat-ergonomics'
+  | 'sealed-roadbed'
   | 'crew-rotation'
   | 'pressurised-transit';
+
+/**
+ * The one node that unlocks something rather than improving it.
+ *
+ * Research is otherwise deliberately not a second unlock tree - the build tree
+ * already answers "what can I build". This is the exception, and it earns it by
+ * unlocking a better version of a thing the colony already owns rather than a
+ * new capability: you can already lay roads, this lets you lay them properly.
+ */
+export const SEALED_ROAD_RESEARCH: ResearchId = 'sealed-roadbed';
 
 export interface ResearchEffects {
   /** Multiplies solar array output. */
@@ -173,6 +184,16 @@ export const RESEARCH: Record<ResearchId, ResearchNode> = {
     blurb:
       'Private quarters, varied sightlines and circadian lighting. Confinement studies consistently find that crews break down over layout long before they break down over workload.',
     effects: { morale: 0.06 },
+  },
+  'sealed-roadbed': {
+    id: 'sealed-roadbed',
+    branch: 'Colony',
+    name: 'Sealed Roadbed',
+    cost: 85,
+    requires: ['habitat-ergonomics'],
+    blurb:
+      'A poured deck and a pressure shell over the service run, so a crossing between two modules is a corridor rather than an EVA. Unlocks the Sealed Transit Way in the road tray - the sealed share of your network raises colony morale.',
+    effects: { morale: 0.02 },
   },
   'crew-rotation': {
     id: 'crew-rotation',

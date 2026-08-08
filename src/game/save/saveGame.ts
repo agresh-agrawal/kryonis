@@ -21,9 +21,14 @@ import type { Profile } from '../state/useProfileStore';
 import type { PlacedBuilding } from '../state/useColonyStore';
 import type { TerrainConfig } from '../world/terrain';
 
-export const SAVE_VERSION = 4;
-const STORAGE_KEY = 'kryonis.save.v4';
-const LEGACY_STORAGE_KEYS = ['kryonis.save.v3', 'kryonis.save.v2', 'kryonis.save.v1'];
+export const SAVE_VERSION = 5;
+const STORAGE_KEY = 'kryonis.save.v5';
+const LEGACY_STORAGE_KEYS = [
+  'kryonis.save.v4',
+  'kryonis.save.v3',
+  'kryonis.save.v2',
+  'kryonis.save.v1',
+];
 
 export interface SaveGame {
   version: number;
@@ -52,6 +57,13 @@ export interface SaveGame {
 
   /** Road tiles as flat grid indices. Absent before v4. */
   roads?: number[];
+
+  /**
+   * Grade of each road tile, in the same order as `roads`. Absent before v5,
+   * where every road was the one grade that existed - so a missing array means
+   * service road throughout, which is exactly what those colonies had.
+   */
+  roadGrades?: number[];
 
   progress: {
     unlocked: ResearchId[];

@@ -23,15 +23,25 @@ import {
 import type { TerrainData } from './terrain';
 
 /**
- * The colony's pressurised walkways.
+ * The colony's road network, in both grades.
  *
- * Nobody crosses Mars in shirtsleeves, so what joins two sectors is a sealed
- * tube with air in it: a glazed arch over a walking deck, with the power and
- * water runs in the service duct beneath the floor where a real installation
- * would put them.
+ * The two grades are drawn as genuinely different pieces of infrastructure,
+ * because they are:
  *
- * Every tile is built from *stubs* - a half-length tube from the tile centre to
- * each neighbour it connects to - rather than one tube per axis. That single
+ *   - A **Service Road** is a graded track. The deck is compacted regolith,
+ *     the power and water runs sit in an open trench either side of it, and
+ *     anyone crossing it is in a suit. Cheap, honest, and it works.
+ *   - A **Sealed Transit Way** is the same route built out: the same deck under
+ *     a glazed pressure arch, with the service runs moved into a duct beneath
+ *     the floor and strip lighting along it.
+ *
+ * Making the upgrade visible from the air is the entire point. A player should
+ * be able to see which parts of the colony are finished and which are still on
+ * dirt without opening a panel, and the moment a run of track turns into a run
+ * of lit tube should be worth the credits on its own.
+ *
+ * Every tile is built from *stubs* - a half-length piece from the tile centre to
+ * each neighbour it connects to - rather than one piece per axis. That single
  * change is what makes corners, T-junctions and crossroads all work: they are
  * just tiles with two non-collinear, three, or four stubs, and each gets a
  * collar at the centre where the stubs meet.
@@ -42,8 +52,15 @@ import type { TerrainData } from './terrain';
  * and fades the glass so you can see through to them.
  */
 
+/** How far off the centre line the service runs sit, per grade. */
+const TRENCH_OFFSET = 0.78;
 const DUCT_OFFSET = 0.44;
 const DUCT_RADIUS = 0.062;
+/** Edge markers down each side of a graded track. */
+const VERGE_OFFSET = 0.92;
+const VERGE_RADIUS = 0.035;
+
+const SEALED = 2;
 
 export function RoadLayer({ terrain }: { terrain: TerrainData }) {
   const version = useRoadStore((state) => state.version);
@@ -55,7 +72,9 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
   const stripRef = useRef<THREE.MeshStandardMaterial>(null);
 
   const geometry = useMemo(() => {
-    const decks: THREE.BufferGeometry[] = [];
+    const trackDecks: THREE.BufferGeometry[] = [];
+    const sealedDecks: THREE.BufferGeometry[] = [];
+    const verges: THREE.BufferGeometry[] = [];
     const glass: THREE.BufferGeometry[] = [];
     const frames: THREE.BufferGeometry[] = [];
     const strips: THREE.BufferGeometry[] = [];
@@ -64,7 +83,8 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
     const wateredDucts: THREE.BufferGeometry[] = [];
     const deadWater: THREE.BufferGeometry[] = [];
 
-    forEachRoadTile(roadGrid, (tx, tz) => {
+    forEachRoadTile(roadGrid, (tx, tz, grade) => {
+      const sealed = grade >= SEALED;
       const [cx, cz] = tileWorld(tx, tz);
       const cy = terrain.generator.heightAt(cx, cz) + DECK_LIFT;
 
@@ -75,26 +95,41 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
       const { power, water } = tileUtilities(tx, tz);
 
       // --- Deck, on shared corner heights so neighbours never step ---------
-      decks.push(deckQuad(terrain, tx, tz));
+      // Both grades use the identical quad. A sealed tile sitting even slightly
+      // higher than the track it continues would put a step at every point the
+      // player upgrades halfway along a run.
+      (sealed ? sealedDecks : trackDecks).push(deckQuad(terrain, tx, tz));
+
+      // The service runs. On a graded track they are trenched out to the side
+      // and plainly visible; under a sealed way they move beneath the floor.
+      const offset = sealed ? DUCT_OFFSET : TRENCH_OFFSET;
+      const radius = sealed ? DUCT_RADIUS : DUCT_RADIUS * 1.25;
 
       for (const dir of connections) {
-        // --- Pressurised shell --------------------------------------------
-        glass.push(archStub(terrain, tx, tz, dir, ARCH_RADIUS, 0));
-
-        // Structural frame just outside the glass, so a run reads as a series
-        // of ribs rather than an extruded pipe.
-        frames.push(archStub(terrain, tx, tz, dir, ARCH_RADIUS + 0.045, 0));
-
-        // --- Floor strip lighting ------------------------------------------
-        // The detail that makes a tube read as somewhere people walk at night.
-        strips.push(ductStub(terrain, tx, tz, dir, 0, 0.028));
-
-        // --- Service ducts --------------------------------------------------
-        const powerDuct = ductStub(terrain, tx, tz, dir, -DUCT_OFFSET, DUCT_RADIUS);
+        const powerDuct = ductStub(terrain, tx, tz, dir, -offset, radius);
         (power ? poweredDucts : deadPower).push(powerDuct);
 
-        const waterDuct = ductStub(terrain, tx, tz, dir, DUCT_OFFSET, DUCT_RADIUS);
+        const waterDuct = ductStub(terrain, tx, tz, dir, offset, radius);
         (water ? wateredDucts : deadWater).push(waterDuct);
+
+        if (sealed) {
+          // --- Pressurised shell ------------------------------------------
+          glass.push(archStub(terrain, tx, tz, dir, ARCH_RADIUS, 0));
+
+          // Structural frame just outside the glass, so a run reads as a series
+          // of ribs rather than an extruded pipe.
+          frames.push(archStub(terrain, tx, tz, dir, ARCH_RADIUS + 0.045, 0));
+
+          // --- Floor strip lighting ----------------------------------------
+          // The detail that makes a tube read as somewhere people walk at night.
+          strips.push(ductStub(terrain, tx, tz, dir, 0, 0.028));
+        } else {
+          // --- Verge markers ------------------------------------------------
+          // Low rails down each side. They are what stop a graded track reading
+          // as a stripe of slightly different dirt.
+          verges.push(ductStub(terrain, tx, tz, dir, -VERGE_OFFSET, VERGE_RADIUS));
+          verges.push(ductStub(terrain, tx, tz, dir, VERGE_OFFSET, VERGE_RADIUS));
+        }
       }
 
       /*
@@ -103,9 +138,9 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
        * On a straight run the stubs are collinear and a collar would just be a
        * bulge, so it is skipped. Anywhere the run turns or divides, the collar
        * is what makes the junction read as a deliberate node rather than two
-       * tubes that happen to intersect.
+       * tubes that happen to intersect. Only sealed ways have a shell to join.
        */
-      if (!isStraightThrough(connections)) {
+      if (sealed && !isStraightThrough(connections)) {
         const collar = new THREE.SphereGeometry(
           ARCH_RADIUS + 0.05,
           14,
@@ -135,7 +170,9 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
     };
 
     return {
-      deck: merge(decks),
+      track: merge(trackDecks),
+      sealedDeck: merge(sealedDecks),
+      verges: merge(verges),
       glass: merge(glass),
       frames: merge(frames),
       strips: merge(strips),
@@ -172,18 +209,39 @@ export function RoadLayer({ terrain }: { terrain: TerrainData }) {
     if (stripRef.current) stripRef.current.emissiveIntensity = 0.9 + pulse * 0.2;
   });
 
-  if (!geometry.deck) return null;
+  if (!geometry.track && !geometry.sealedDeck) return null;
 
   return (
-    <group name="walkways">
-      <mesh geometry={geometry.deck} receiveShadow>
-        <meshStandardMaterial
-          color="#6d5e50"
-          roughness={0.92}
-          metalness={0.02}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+    <group name="roads">
+      {/* Graded track: compacted regolith, a shade darker than the ground. */}
+      {geometry.track ? (
+        <mesh geometry={geometry.track} receiveShadow>
+          <meshStandardMaterial
+            color="#6d5e50"
+            roughness={0.95}
+            metalness={0.02}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ) : null}
+
+      {/* Sealed deck: poured composite, pale and slightly polished. */}
+      {geometry.sealedDeck ? (
+        <mesh geometry={geometry.sealedDeck} receiveShadow>
+          <meshStandardMaterial
+            color="#9aa1a6"
+            roughness={0.62}
+            metalness={0.14}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ) : null}
+
+      {geometry.verges ? (
+        <mesh geometry={geometry.verges} castShadow>
+          <meshStandardMaterial color="#8e857a" roughness={0.7} metalness={0.25} />
+        </mesh>
+      ) : null}
 
       {geometry.strips ? (
         <mesh geometry={geometry.strips}>

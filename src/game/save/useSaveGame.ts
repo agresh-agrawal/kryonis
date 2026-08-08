@@ -1,10 +1,11 @@
 'use client';
 
 import { BUILDING_IDS } from '../buildings/catalog';
+import { REGION_TILES } from '../core/constants';
 import { useColonyStore } from '../state/useColonyStore';
 import { useCrewStore } from '../state/useCrewStore';
 import { DEFAULT_PROFILE, useProfileStore } from '../state/useProfileStore';
-import { captureRoads, useRoadStore } from '../state/useRoadStore';
+import { captureRoadGrades, captureRoads, useRoadStore } from '../state/useRoadStore';
 import { useProgressStore } from '../state/useProgressStore';
 import { GAME_SPEEDS, useTimeStore, worldClock, type GameSpeed } from '../state/useTimeStore';
 import { useWorldStore } from '../state/useWorldStore';
@@ -44,6 +45,7 @@ export function captureSave(): SaveGame {
     },
     time: { paused: time.paused, speed: time.speed },
     roads: captureRoads(),
+    roadGrades: captureRoadGrades(),
     colony: {
       buildings: colony.buildings,
       stock: colony.stock,
@@ -91,7 +93,21 @@ export function loadSave(): boolean {
 
   resetColonists();
 
-  const buildings = pruneUnknownBuildings(save.colony.buildings, KNOWN_BUILDINGS);
+  /*
+   * Roads used to be placeable structures as well as grid tiles, and the two
+   * paths behaved differently. There is now one road, laid with the road tray
+   * straight into the grid - so a colony saved before that change is carrying
+   * road *buildings* that would sit on the map as 1x1 props, occupying tiles
+   * nothing can be built on and connecting nothing.
+   *
+   * They are folded into the grid here, at the grade they were: service road.
+   */
+  const known = pruneUnknownBuildings(save.colony.buildings, KNOWN_BUILDINGS);
+  const buildings = known.filter((building) => building.type !== 'road');
+  const migratedRoads = known
+    .filter((building) => building.type === 'road')
+    .map((building) => building.tz * REGION_TILES + building.tx);
+
   useColonyStore.getState().restore({
     buildings,
     stock: save.colony.stock,
@@ -100,8 +116,23 @@ export function loadSave(): boolean {
     happiness: save.colony.happiness,
     batteryCharge: save.colony.batteryCharge,
   });
-  // Roads before the colony resolves, so the first solve sees both.
-  useRoadStore.getState().restore(save.roads ?? []);
+  /*
+   * Roads before the colony resolves, so the first solve sees both.
+   *
+   * Migrated tiles are appended after the saved ones and de-duplicated, because
+   * a road that existed both as a structure and as a grid tile - which the two
+   * placement paths could easily produce - must not be restored twice.
+   */
+  const savedRoads = save.roads ?? [];
+  const savedGrades = save.roadGrades ?? [];
+  const tiles = [...savedRoads];
+  const grades = savedRoads.map((_, order) => savedGrades[order] ?? 1);
+  for (const index of migratedRoads) {
+    if (tiles.includes(index)) continue;
+    tiles.push(index);
+    grades.push(1);
+  }
+  useRoadStore.getState().restore(tiles, grades);
   useCrewStore.getState().restore(save.crew);
   useCrewStore.getState().reconcilePopulation(save.colony.population);
 

@@ -9,12 +9,26 @@ import {
   upgradeCost,
   upgradeTier,
 } from '../buildings/catalog';
+import { serviceChecklist, structureStatus, type StatusTone } from '../buildings/status';
 import { RESOURCES, canAfford, formatAmount, type ResourceId } from '../core/resources';
 import { constructionProgress, useColonyStore } from '../state/useColonyStore';
-import { serviceProblem } from '../world/roads';
 import { BUILDING_ICONS } from './buildingIcons';
 import { UpgradeIcon } from './icons';
 import { useTicker } from './useTicker';
+
+const TONE_TEXT: Record<StatusTone, string> = {
+  good: 'text-good',
+  warn: 'text-warn',
+  alert: 'text-alert',
+  idle: 'text-ash',
+};
+
+const TONE_BAR: Record<StatusTone, string> = {
+  good: 'bg-good',
+  warn: 'bg-warn',
+  alert: 'bg-alert',
+  idle: 'bg-titanium',
+};
 
 /**
  * The selected-structure inspector.
@@ -51,13 +65,15 @@ export function FloatingInspector() {
   const progress = underWork ? (constructionProgress.get(building_.id) ?? 0) : 1;
 
   /*
-   * Why this structure is not running, if it is not.
+   * What this structure is doing, and what is stopping it if it is not.
    *
    * Recomputed every render rather than cached: the network changes whenever
-   * anything is built or demolished anywhere in the colony, and a stale answer
-   * here would be worse than none.
+   * anything is built or demolished anywhere in the colony, and what a plant is
+   * actually managing changes four times a second. A stale answer here would be
+   * worse than none.
    */
-  const problem = serviceProblem(building_);
+  const status = structureStatus(building_, progress);
+  const services = serviceChecklist(building_);
 
   const atMax = building_.level >= MAX_UPGRADE_LEVEL;
   const nextTier = atMax ? null : UPGRADE_TIERS[building_.level];
@@ -102,15 +118,6 @@ export function FloatingInspector() {
               : tier.name}
           </span>
 
-          {/*
-            Why this structure is not running.
-            A dark building with no explanation is the worst possible feedback,
-            and connection problems are invisible from the outside - the road
-            might be there but carrying nothing.
-          */}
-          {!underWork && problem ? (
-            <span className="t-sm mt-1.5 block leading-snug text-alert">{problem}</span>
-          ) : null}
         </span>
 
         <button
@@ -123,6 +130,66 @@ export function FloatingInspector() {
             <path d="M2.4 1.3L6 4.9l3.6-3.6 1.1 1.1L7.1 6l3.6 3.6-1.1 1.1L6 7.1l-3.6 3.6-1.1-1.1L4.9 6 1.3 2.4z" />
           </svg>
         </button>
+      </div>
+
+      <span className="rule-x" />
+
+      {/*
+        What it is doing, right now.
+
+        The single most important line on the card, and the one that was missing
+        entirely: a finished structure used to look identical whether it was
+        running flat out or standing dark, and the only clue was a resource bar
+        failing to move somewhere else on the screen.
+      */}
+      <div className="px-3 py-2.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className={`t-sm ${TONE_TEXT[status.tone]}`}>{status.headline}</span>
+          <span className="t-num shrink-0 text-[0.62rem] text-faint">
+            {status.working || status.rate > 0 ? `${Math.round(status.rate * 100)}%` : ''}
+          </span>
+        </div>
+
+        {status.detail ? (
+          <p className="t-sm mt-1 leading-snug text-faint">{status.detail}</p>
+        ) : null}
+
+        {/* A meter, not a ring: this is a rate, and rates read as bars. */}
+        <span className="mt-2 block h-[3px] w-full overflow-hidden rounded-full bg-white/10">
+          <span
+            className={`block h-full rounded-full transition-[width] duration-500 ${TONE_BAR[status.tone]}`}
+            style={{ width: `${Math.max(2, Math.min(100, status.rate * 100))}%` }}
+          />
+        </span>
+      </div>
+
+      <span className="rule-x" />
+
+      {/*
+        The three services, and which one is missing.
+
+        Only the ones this structure actually needs are listed - telling a solar
+        array it has no water is noise, and noise is what stops the one line
+        that matters from being read.
+      */}
+      <div className="flex items-stretch gap-px bg-white/[0.05]">
+        {services.map((service) => (
+          <div key={service.label} className="flex-1 bg-graphite/60 px-3 py-2" title={service.note}>
+            <span className="flex items-center gap-1.5">
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  service.ok ? 'bg-good' : 'anim-breathe bg-alert'
+                }`}
+              />
+              <span className="t-micro">{service.label}</span>
+            </span>
+            <span
+              className={`t-sm mt-1 block truncate ${service.ok ? 'text-ash' : 'text-alert'}`}
+            >
+              {service.ok ? 'Connected' : 'Missing'}
+            </span>
+          </div>
+        ))}
       </div>
 
       <span className="rule-x" />

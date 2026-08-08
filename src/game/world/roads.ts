@@ -18,6 +18,11 @@
  * on one of them does nothing for the other. That is the entire rule, and it is
  * why laying out the colony is a decision rather than a formality.
  *
+ * A tile also carries a **grade** - see `roadGrades.ts`. Grade changes nothing
+ * about what the network delivers, deliberately: a player must never have to
+ * work out whether a dark building is dark because of the topology or because
+ * of the surface. Grade buys quality of life, and only that.
+ *
  * All of this lives outside React in flat typed arrays, like the occupancy grid,
  * because it is rebuilt whenever the colony changes and read every simulation
  * tick. A store would re-render the interface for something the interface only
@@ -27,8 +32,15 @@
 import { REGION_TILES, TILE_SIZE, WORLD_HALF } from '../core/constants';
 import { BUILDINGS, rotatedFootprint, type BuildingId } from '../buildings/catalog';
 import type { PlacedBuilding } from '../state/useColonyStore';
+import { NO_ROAD, type RoadGrade } from './roadGrades';
 
-/** 1 where a road tile exists. Indexed `tz * REGION_TILES + tx`. */
+/**
+ * Road grade per tile: 0 for none, otherwise the `RoadGrade`.
+ *
+ * Indexed `tz * REGION_TILES + tx`. This used to be a plain 0/1 presence flag;
+ * every read of it goes through `hasRoad` or `gradeAt` so that widening it did
+ * not mean auditing every `=== 1` in the codebase.
+ */
 export const roadGrid = new Uint8Array(REGION_TILES * REGION_TILES);
 
 /** Which network each tile belongs to, or -1. Rebuilt by `solveNetworks`. */
@@ -46,11 +58,23 @@ export interface RoadNetworks {
   watered: boolean[];
   /** Per network: how many tiles it spans, for the readout. */
   size: number[];
+  /** Per network: how many of those tiles are sealed transit way. */
+  sealed: number[];
   /** Total road tiles laid. */
   tiles: number;
+  /** How many of those are sealed, colony-wide. */
+  sealedTiles: number;
 }
 
-let networks: RoadNetworks = { count: 0, powered: [], watered: [], size: [], tiles: 0 };
+let networks: RoadNetworks = {
+  count: 0,
+  powered: [],
+  watered: [],
+  size: [],
+  sealed: [],
+  tiles: 0,
+  sealedTiles: 0,
+};
 
 /**
  * Service state for one structure.
@@ -67,6 +91,8 @@ export interface ServiceState {
   operational: boolean;
   /** The network it is attached to, or -1. */
   network: number;
+  /** Best grade of road touching it, or 0. Cosmetic; nothing depends on it. */
+  grade: number;
 }
 
 const serviceByBuilding = new Map<string, ServiceState>();
@@ -78,39 +104,76 @@ export function tileIndexOf(tx: number, tz: number): number {
 
 export function hasRoad(tx: number, tz: number): boolean {
   const index = tileIndexOf(tx, tz);
-  return index >= 0 && roadGrid[index] === 1;
+  return index >= 0 && roadGrid[index] !== NO_ROAD;
 }
 
-export function setRoad(tx: number, tz: number, present: boolean): boolean {
+/** Grade laid on a tile, or 0 for bare ground. */
+export function gradeAt(tx: number, tz: number): number {
+  const index = tileIndexOf(tx, tz);
+  return index < 0 ? NO_ROAD : roadGrid[index];
+}
+
+/** Writes a grade to a tile. Pass `NO_ROAD` to lift the road. */
+export function setRoad(tx: number, tz: number, grade: number): boolean {
   const index = tileIndexOf(tx, tz);
   if (index < 0) return false;
-  const next = present ? 1 : 0;
+  const next = grade === NO_ROAD ? NO_ROAD : (grade as RoadGrade);
   if (roadGrid[index] === next) return false;
   roadGrid[index] = next;
   return true;
 }
 
 export function clearRoads(): void {
-  roadGrid.fill(0);
+  roadGrid.fill(NO_ROAD);
   componentOf.fill(-1);
   serviceByBuilding.clear();
-  networks = { count: 0, powered: [], watered: [], size: [], tiles: 0 };
+  networks = {
+    count: 0,
+    powered: [],
+    watered: [],
+    size: [],
+    sealed: [],
+    tiles: 0,
+    sealedTiles: 0,
+  };
 }
 
-/** Every road tile, as `[tx, tz]` pairs. Used by the renderer and by saves. */
+/** Every road tile as a flat grid index. Used by the renderer and by saves. */
 export function listRoadTiles(): number[] {
   const tiles: number[] = [];
   for (let i = 0; i < roadGrid.length; i++) {
-    if (roadGrid[i] === 1) tiles.push(i);
+    if (roadGrid[i] !== NO_ROAD) tiles.push(i);
   }
   return tiles;
 }
 
-export function restoreRoads(indices: number[]): void {
-  roadGrid.fill(0);
-  for (const index of indices) {
-    if (index >= 0 && index < roadGrid.length) roadGrid[index] = 1;
+/** Grades for those tiles, in the same order. */
+export function listRoadGrades(): number[] {
+  const grades: number[] = [];
+  for (let i = 0; i < roadGrid.length; i++) {
+    if (roadGrid[i] !== NO_ROAD) grades.push(roadGrid[i]);
   }
+  return grades;
+}
+
+/**
+ * Restores a saved network.
+ *
+ * `grades` is optional because saves written before grades existed have only
+ * the tile list. Those load as service road, which is what they were.
+ */
+export function restoreRoads(indices: number[], grades?: number[]): void {
+  roadGrid.fill(NO_ROAD);
+  indices.forEach((index, order) => {
+    if (index < 0 || index >= roadGrid.length) return;
+    const grade = grades?.[order];
+    roadGrid[index] = grade === 2 ? 2 : 1;
+  });
+}
+
+/** Share of the laid network that is sealed, 0-1. */
+export function sealedShare(): number {
+  return networks.tiles > 0 ? networks.sealedTiles / networks.tiles : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +212,12 @@ export function needsWater(id: BuildingId): boolean {
  * themselves obviously do not need roads.
  */
 function isExempt(id: BuildingId): boolean {
-  return id === 'lander';
+  // `road` is no longer placeable - roads are laid with the road tool straight
+  // into the grid above - but a colony saved before that change can still be
+  // carrying road *structures*, and asking a road whether it is connected to a
+  // road produces both a nonsense warning and a gate tunnel drawn between two
+  // adjacent road tiles.
+  return id === 'lander' || id === 'road';
 }
 
 // ---------------------------------------------------------------------------
@@ -168,11 +236,13 @@ export function solveNetworks(buildings: PlacedBuilding[]): RoadNetworks {
 
   let count = 0;
   let tiles = 0;
+  let sealedTiles = 0;
   const size: number[] = [];
+  const sealed: number[] = [];
 
   // --- 1. Flood fill road tiles into connected networks -------------------
   for (let start = 0; start < roadGrid.length; start++) {
-    if (roadGrid[start] !== 1 || componentOf[start] !== -1) continue;
+    if (roadGrid[start] === NO_ROAD || componentOf[start] !== -1) continue;
 
     const id = count++;
     let head = 0;
@@ -180,11 +250,16 @@ export function solveNetworks(buildings: PlacedBuilding[]): RoadNetworks {
     floodQueue[tail++] = start;
     componentOf[start] = id;
     let spans = 0;
+    let spansSealed = 0;
 
     while (head < tail) {
       const index = floodQueue[head++];
       spans++;
       tiles++;
+      if (roadGrid[index] === 2) {
+        spansSealed++;
+        sealedTiles++;
+      }
 
       const tx = index % REGION_TILES;
       const tz = (index / REGION_TILES) | 0;
@@ -201,13 +276,14 @@ export function solveNetworks(buildings: PlacedBuilding[]): RoadNetworks {
 
       for (const next of neighbours) {
         if (next < 0) continue;
-        if (roadGrid[next] !== 1 || componentOf[next] !== -1) continue;
+        if (roadGrid[next] === NO_ROAD || componentOf[next] !== -1) continue;
         componentOf[next] = id;
         floodQueue[tail++] = next;
       }
     }
 
     size.push(spans);
+    sealed.push(spansSealed);
   }
 
   const powered = new Array<boolean>(count).fill(false);
@@ -217,7 +293,7 @@ export function solveNetworks(buildings: PlacedBuilding[]): RoadNetworks {
   for (const building of buildings) {
     if (building.progress < 1 || !building.enabled) continue;
 
-    const attached = networksTouching(building);
+    const { networks: attached } = networksTouching(building);
     if (attached.length === 0) continue;
 
     for (const network of attached) {
@@ -226,7 +302,7 @@ export function solveNetworks(buildings: PlacedBuilding[]): RoadNetworks {
     }
   }
 
-  networks = { count, powered, watered, size, tiles };
+  networks = { count, powered, watered, size, sealed, tiles, sealedTiles };
 
   // --- 3. Consumers read back what their network carries ------------------
   serviceByBuilding.clear();
@@ -237,10 +313,17 @@ export function solveNetworks(buildings: PlacedBuilding[]): RoadNetworks {
   return networks;
 }
 
-/** Networks touched by a structure's footprint perimeter. */
-function networksTouching(building: PlacedBuilding): number[] {
+/**
+ * Networks touched by a structure's footprint perimeter, and the best grade of
+ * road among them.
+ *
+ * Returned together because both come from the same walk of the ring and the
+ * callers that want one usually want the other.
+ */
+function networksTouching(building: PlacedBuilding): { networks: number[]; grade: number } {
   const [w, d] = rotatedFootprint(building.type, building.rotation);
   const found = new Set<number>();
+  let grade = NO_ROAD;
 
   // Walk the ring of tiles immediately outside the footprint.
   for (let dx = -1; dx <= w; dx++) {
@@ -253,23 +336,31 @@ function networksTouching(building: PlacedBuilding): number[] {
       if (isCorner) continue;
 
       const index = tileIndexOf(building.tx + dx, building.tz + dz);
-      if (index < 0 || roadGrid[index] !== 1) continue;
+      if (index < 0 || roadGrid[index] === NO_ROAD) continue;
+      if (roadGrid[index] > grade) grade = roadGrid[index];
       const component = componentOf[index];
       if (component >= 0) found.add(component);
     }
   }
 
-  return [...found];
+  return { networks: [...found], grade };
 }
 
 function computeService(building: PlacedBuilding): ServiceState {
   const type = building.type;
 
   if (isExempt(type)) {
-    return { connected: true, hasPower: true, hasWater: true, operational: true, network: -1 };
+    return {
+      connected: true,
+      hasPower: true,
+      hasWater: true,
+      operational: true,
+      network: -1,
+      grade: NO_ROAD,
+    };
   }
 
-  const attached = networksTouching(building);
+  const { networks: attached, grade } = networksTouching(building);
   const connected = attached.length > 0;
 
   // A structure on two networks gets the best of both, which is what physically
@@ -280,7 +371,7 @@ function computeService(building: PlacedBuilding): ServiceState {
   const operational =
     connected && (!needsPower(type) || hasPower) && (!needsWater(type) || hasWater);
 
-  return { connected, hasPower, hasWater, operational, network: attached[0] ?? -1 };
+  return { connected, hasPower, hasWater, operational, network: attached[0] ?? -1, grade };
 }
 
 /** Service state for a structure. Safe to call before the first solve. */
@@ -292,6 +383,7 @@ export function serviceOf(buildingId: string): ServiceState {
       hasWater: false,
       operational: false,
       network: -1,
+      grade: NO_ROAD,
     }
   );
 }
@@ -321,22 +413,16 @@ export function tileCentre(tx: number, tz: number): [number, number] {
   return [(tx + 0.5) * TILE_SIZE - WORLD_HALF, (tz + 0.5) * TILE_SIZE - WORLD_HALF];
 }
 
-/**
- * A short plain-English reason a structure is not running.
+/*
+ * `serviceProblem` used to live here: one short sentence naming whichever of
+ * road, power or water was missing.
  *
- * Returns null when everything is fine. The wording matters: "not connected to
- * a road" tells the player what to do, "offline" does not.
+ * It has moved to `buildings/status.ts` and grown into `structureStatus`, which
+ * answers the same question and the two next ones - what this structure is for,
+ * and how much of that it is currently managing. Keeping a second, thinner
+ * answer here would have guaranteed the two drifted apart, and the thin one was
+ * the one the interface no longer used.
  */
-export function serviceProblem(building: PlacedBuilding): string | null {
-  const type = building.type;
-  if (isExempt(type)) return null;
-
-  const state = serviceOf(building.id);
-  if (!state.connected) return 'Not connected to a road';
-  if (needsPower(type) && !state.hasPower) return 'No power on this road';
-  if (needsWater(type) && !state.hasWater) return 'No water on this road';
-  return null;
-}
 
 /**
  * Where a structure's gate meets the walkway.

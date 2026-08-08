@@ -38,14 +38,17 @@ export const OUTER_TERRAIN_RADIUS = 1400;
  */
 export const START_UNLOCK_RADIUS = 44;
 
-/**
- * Cost of one road tile.
+/*
+ * Road pricing lives in `world/roadGrades.ts`.
  *
- * Deliberately small. Roads are the thing that makes every other structure
- * work, so pricing them like a building would turn the colony's circulatory
- * system into a luxury and leave players with a crater full of dead hardware.
+ * There is more than one grade of road now, each with its own price to lay and
+ * its own price to upgrade to, and a lone `ROAD_COST` here could only ever have
+ * been one of those four numbers. The rule it encoded is still true and is
+ * restated there: the cheap grade stays cheap, because roads are what make
+ * every other structure work and pricing them like a building leaves the player
+ * with a crater full of dead hardware.
  */
-export const ROAD_COST = 45;
+
 export const UNLOCK_STEP = 10;
 
 /** Slope above which terrain is considered cliff and cannot be built on. */

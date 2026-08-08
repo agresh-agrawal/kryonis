@@ -1,46 +1,40 @@
 'use client';
 
-import { ROAD_COST } from '../core/constants';
-import { formatAmount } from '../core/resources';
-import { useBuildStore } from '../state/useBuildStore';
-import { useColonyStore } from '../state/useColonyStore';
 import { useRoadStore } from '../state/useRoadStore';
 
 /**
- * The road tool, and the utility overlay that goes with it.
+ * The grid readout.
  *
- * Roads are not in the build deck because they are not a structure - they are
- * the thing structures plug into, and they are laid by dragging rather than by
- * placing. Giving them their own control next to demolish says that clearly.
+ * This used to be the road *tool* as well, which put the control that creates
+ * the colony's most common problem in a different place from every other thing
+ * you build. Laying road now happens in the Roads tray of the construction
+ * deck, alongside the structures it connects, and what is left here is the
+ * instrument: how many separate grids exist, how many of them are live, and
+ * how much of the network has been sealed.
  *
- * The overlay toggle is the diagnostic: it brightens both conduits across the
- * whole colony so a player can see at a glance which runs are live and where
- * the network stops. That is the answer to "why is this building not working",
- * and it needs to be one click away from the tool that causes the problem.
+ * Those three numbers answer the question the player actually arrives with -
+ * "why is that building dark?" - because the overwhelmingly common answer is
+ * "you have two grids and the generator is on the other one".
+ *
+ * The overlay toggle stays here rather than in the deck because it is a way of
+ * *looking* at the colony, not a way of changing it, and it has to be reachable
+ * without entering build mode.
  */
-export function RoadChip() {
-  const tool = useBuildStore((state) => state.tool);
-  const setTool = useBuildStore((state) => state.setTool);
-  const cancel = useBuildStore((state) => state.cancel);
-
+export function RoadChip({ onOpenRoads }: { onOpenRoads: () => void }) {
   const networks = useRoadStore((state) => state.networks);
   const showUtilities = useRoadStore((state) => state.showUtilities);
   const setShowUtilities = useRoadStore((state) => state.setShowUtilities);
-  const money = useColonyStore((state) => state.stock.money);
 
-  const active = tool === 'road';
   const live = networks.powered.filter(Boolean).length;
+  const sealed = networks.tiles > 0 ? networks.sealedTiles / networks.tiles : 0;
 
   return (
     <div className="glass anim-fade pointer-events-auto flex items-center gap-2.5 rounded-[3px] px-2.5 py-2">
       <button
         type="button"
-        onClick={() => (active ? cancel() : setTool('road'))}
-        aria-pressed={active}
-        title={`Lay road — ${formatAmount(ROAD_COST)} credits a tile. Drag to draw, drag over a road to remove it.`}
-        className={`press flex items-center gap-2 rounded-[2px] px-1.5 py-1 transition-colors ${
-          active ? 'text-dust' : 'text-titanium hover:text-bone'
-        }`}
+        onClick={onOpenRoads}
+        title="Open the road tray"
+        className="press flex items-center gap-2 rounded-[2px] px-1 py-0.5 text-titanium transition-colors hover:text-bone"
       >
         <svg viewBox="0 0 20 20" className="h-4 w-4 fill-current" aria-hidden>
           {/* A road running to the horizon, with its centre line. */}
@@ -48,12 +42,50 @@ export function RoadChip() {
           <path d="M9.7 5h0.6v2h-0.6zM9.7 9h0.6v2h-0.6zM9.7 13h0.6v2h-0.6z" opacity="0.5" />
         </svg>
         <span className="flex flex-col items-start">
-          <span className="t-micro">Road</span>
-          <span className={`t-num mt-1 text-[0.7rem] ${money >= ROAD_COST ? '' : 'text-warn'}`}>
-            {formatAmount(ROAD_COST)}
+          <span className="t-micro">Grid</span>
+          <span className="t-num mt-1 text-[0.7rem] text-ash">
+            {networks.tiles === 0 ? 'None laid' : `${networks.tiles} tiles`}
           </span>
         </span>
       </button>
+
+      <span className="rule-y h-7" />
+
+      {/*
+        Live grids out of total.
+
+        Two separate networks is the single most common reason a colony has
+        power in one place and none in another, so it is worth saying out loud
+        the moment there is more than one.
+      */}
+      {networks.count > 0 ? (
+        <span
+          className="flex flex-col items-start"
+          title={
+            networks.count > 1
+              ? `${live} of ${networks.count} grids have a generator on them`
+              : 'The colony is one connected grid'
+          }
+        >
+          <span className="t-micro">Live</span>
+          <span className={`t-num mt-1 text-[0.7rem] ${live < networks.count ? 'text-warn' : 'text-good'}`}>
+            {live}/{networks.count}
+          </span>
+        </span>
+      ) : null}
+
+      {/* Sealed share. Only once there is something to seal. */}
+      {networks.tiles > 0 ? (
+        <span
+          className="flex flex-col items-start"
+          title="Share of the network built as sealed transit way. Raises colony morale."
+        >
+          <span className="t-micro">Sealed</span>
+          <span className={`t-num mt-1 text-[0.7rem] ${sealed > 0 ? 'text-dust' : 'text-faint'}`}>
+            {Math.round(sealed * 100)}%
+          </span>
+        </span>
+      ) : null}
 
       <span className="rule-y h-7" />
 
@@ -72,20 +104,6 @@ export function RoadChip() {
           <path d="M2 10.5h12" stroke="#4fa8e0" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
-
-      {/*
-        Network count, only once there is more than one.
-        Two separate grids is the single most common reason a colony has power
-        somewhere and no power somewhere else, so it is worth saying out loud.
-      */}
-      {networks.count > 1 ? (
-        <span className="flex flex-col items-start">
-          <span className="t-micro">Grids</span>
-          <span className={`t-num mt-1 text-[0.7rem] ${live < networks.count ? 'text-warn' : ''}`}>
-            {live}/{networks.count}
-          </span>
-        </span>
-      ) : null}
     </div>
   );
 }

@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import { Line } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import type { QualitySettings } from '../core/quality';
 import { currentDoctrine } from '../state/useProfileStore';
 import { useTimeStore } from '../state/useTimeStore';
+import { announce } from '../state/useToastStore';
+import { serviceOf } from '../world/roads';
 import {
   buildingTransform,
   constructionProgress,
@@ -67,44 +68,20 @@ export function BuildingsLayer({
     return [...groups.entries()];
   }, [buildings]);
 
-  const utilityLinks = useMemo(() => {
-    const anchors = buildings.filter(
-      (building) => building.progress >= 1 && building.enabled && (building.type === 'road' || building.type === 'lander'),
-    );
-
-    return buildings.flatMap((building) => {
-      if (building.progress < 1 || !building.enabled || building.type === 'road' || building.type === 'lander') {
-        return [];
-      }
-
-      const from = buildingTransform(terrain, building);
-      let bestAnchor: PlacedBuilding | null = null;
-      let bestDistance = Infinity;
-
-      for (const anchor of anchors) {
-        const to = buildingTransform(terrain, anchor);
-        const distance = Math.hypot(from.x - to.x, from.z - to.z);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestAnchor = anchor;
-        }
-      }
-
-      if (!bestAnchor || bestDistance > 10) return [];
-
-      const to = buildingTransform(terrain, bestAnchor);
-      return [
-        {
-          id: building.id,
-          points: [
-            [from.x, from.y + 1.35, from.z],
-            [to.x, to.y + 0.45, to.z],
-          ] as [number, number, number][],
-          color: building.type === 'solar' || building.type === 'battery' ? '#f4cf5c' : '#5fd3ff',
-        },
-      ];
-    });
-  }, [buildings, terrain]);
+  /*
+   * The "utility links" that used to be drawn here have been removed.
+   *
+   * They were floating coloured lines from each structure to the nearest
+   * *road building* or the lander - and road buildings no longer exist, so the
+   * fallback was always the lander. Every structure within ten metres of the
+   * hub got a line to it whether or not a road connected them, which is exactly
+   * backwards: the one thing a connection indicator must never do is claim a
+   * connection that is not there.
+   *
+   * `GateConnectors` draws the real thing. It runs a tube from the structure's
+   * gate to the road tile it is actually touching, and draws nothing at all
+   * when it is touching none - so the presence of the tube *is* the readout.
+   */
 
   // Advance construction and drive time-of-day surfaces.
   useFrame(({ clock }, rawDelta) => {
@@ -128,6 +105,27 @@ export function BuildingsLayer({
       if (next >= 1) {
         completionFlash.current.set(building.id, clock.elapsedTime);
         completeConstruction(building.id);
+
+        /*
+         * The moment a structure finishes is the moment to say it will not run.
+         *
+         * The player is watching this exact building - they have been waiting
+         * for it - and a badge appearing silently over the roof is easy to miss
+         * in the half second before the camera moves on. The badge stays; this
+         * is the nudge that sends them to look at it.
+         */
+        const service = serviceOf(building.id);
+        if (!service.operational) {
+          announce(
+            `${BUILDINGS[building.type].name} is not connected`,
+            !service.connected
+              ? 'Lay a road up to it before it will run'
+              : !service.hasPower
+                ? 'Its road run has no generator on it'
+                : 'Its road run has no water on it',
+            'warn',
+          );
+        }
       } else {
         constructionProgress.set(building.id, next);
       }
@@ -138,18 +136,6 @@ export function BuildingsLayer({
     <group name="colony">
       {/* Pads first: they are what the structures above are standing on. */}
       <FoundationLayer terrain={terrain} quality={quality} materials={materials} />
-
-      {utilityLinks.map((link) => (
-        <Line
-          key={link.id}
-          points={link.points}
-          color={link.color}
-          lineWidth={1.2}
-          transparent
-          opacity={0.55}
-          depthTest={false}
-        />
-      ))}
 
       {byType.map(([type, list]) => (
         <BuildingTypeInstances

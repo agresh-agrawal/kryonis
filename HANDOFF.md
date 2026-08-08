@@ -60,6 +60,26 @@ building prerequisites (Lab → Reactor, Mine → Factory → Propellant Plant).
 Research is separate and only makes what you own *work better*. The two answer
 different questions: "what can I build" vs "how well does it run".
 
+**There is exactly one exception, and it is deliberate.** `Sealed Roadbed`
+unlocks the Sealed Transit Way. It earns the exception by unlocking a better
+version of something the colony already owns — you could already lay roads —
+rather than a new capability. Do not take it as a precedent.
+
+**Roads have two grades and the better one buys morale, not throughput.** A
+Sealed Transit Way carries exactly the same power and water as a Service Road.
+This was decided against the more obvious "sealed roads lose less power",
+because grade would then be a second reason a building can be dark, and the
+player would have to work out whether the problem was the topology or the
+surface. Connection is a yes/no question and must stay one. What the sealed way
+buys is that crews walk it in shirtsleeves, which is morale, scaled linearly by
+the sealed share of the network — so the first sealed tile pays as much as the
+last and there is no threshold to hold out for.
+
+**One road, one way to lay it.** Roads live in a flat grid (`roadGrid`), not in
+the building list, and are painted from the Roads tray of the construction deck.
+The `road` catalog entry still exists but is `placeable: false`; it is there so
+saves written when roads were structures still load. See the bug table.
+
 **No hard failure.** Life-support collapse kills colonists and tanks morale, but
 the colony always survives and can rebuild.
 
@@ -145,6 +165,11 @@ canvases from periodic value noise.
 | Imported models silently unused | three's `GLTFLoader` runs node names through `sanitizeNodeName`, which strips characters reserved for animation paths — including `:`. Meshes written as `mat:hull` arrived as `mathull`. Every model loaded, matched nothing, and fell back to procedural geometry with **no error at all**. | Pipeline writes `mat_<key>`. **Lesson: never put `:` or `.` in a glTF node name you intend to read back.** |
 | Downloaded model would not simplify | glTF-Transform v4's `weld` merges only *bitwise identical* vertices — there is no distance tolerance. With normals present, nothing welds on hard-surface geometry, so meshopt has no edges to collapse: the oil rig would not go below 76% at any ratio. | Strip normals → weld → simplify → regenerate normals. |
 | Models measured the wrong size | `flatten()` removes the node *hierarchy* but leaves each node's own transform in place; it does not touch vertex data. Anything reading raw accessors afterwards is reading local space. | `flattenAndBake()` in `tools/lib-gltf.mjs`. Meshes shared by several nodes must be deep-copied first, or baking one node moves the others. |
+| Roads behaved differently depending on where you got them | Roads existed twice: a `Service Road` card in the build deck, which stamped the occupancy grid and blocked the tile, and the drag-paint road tool, which wrote only `roadGrid` and blocked nothing. Same "road", two colonies. | One path. `road` is `placeable: false`; the Roads tray in the deck is the only source. `loadSave` folds any road *structures* from an old save into the grid. |
+| A building could be dropped on top of a laid road | Tool-laid roads are not in the occupancy grid — they are a separate flat array, because the solver and renderer both want a graph rather than 200 structures. So the tile read as empty. | `checkPlacement` refuses a footprint containing `hasRoad`, and `checkTile` in `useRoadStore` refuses a tile with an occupant. Both directions, or the hole just moves. |
+| Road could be painted on cliffs, outside the perimeter, and for free | `lay()` had no validation at all — not terrain, not territory, not cost beyond the spend. | `checkTile` applies the same three tests structures get, and returns a *typed refusal* so the cursor can say which one. |
+| A finished structure that was not running looked exactly like one that was | The only feedback was a resource bar failing to rise somewhere else on screen. `serviceProblem` existed but was one line in a panel you had to open. | The simulation now records a per-building `BuildingActivity` (rate + what is limiting it) each tick, outside React. `structureStatus` turns that into words, `StatusMarkers` floats a badge over the offender, and the advisor ranks "not connected" above everything except life support. |
+| Connection lines that lied | `BuildingsLayer.utilityLinks` drew a line from each structure to the nearest road *building* or the lander. Road buildings no longer existed, so every structure within 10 m of the hub got a line whether or not a road connected them. | Removed. `GateConnectors` draws the real tube, and draws nothing when there is no connection — so the tube's presence *is* the readout. |
 | Small text unreadable | `--color-faint` and `--color-titanium` were both `#6d665e` — 3.5:1 on the void background, under the 4.5:1 needed for body text — and locked states were expressed as `opacity-40` on top of that. | Both colours lifted above 4.5:1; locked/blocked/owned states now use the `state-*` utilities in `globals.css`, which keep full text contrast and change the *container* instead. |
 
 **Lesson worth keeping:** the dev-server log buffer is cumulative since server
@@ -167,6 +192,12 @@ Restart the server before trusting a "still failing" log.
 - **V2 Pass 1** Full-screen consoles, research-as-projects, mission doctrine,
   4-step new-colony wizard, foundation plinths, save v3, persistent settings,
   0.5×/1×/3× time, contrast and locked-state pass.
+
+- **V2 Pass 2 (roads & readouts)** Two road grades with the sealed way behind
+  `Sealed Roadbed` research; roads laid only from the Roads tray; road placement
+  validated against terrain, territory, occupancy and cost; per-structure
+  activity readouts (inspector line, meter, service checklist, in-world badges);
+  connection warning on completion and in the advisor; save v5.
 
 ### Not done — this is V2 Pass 2
 
@@ -193,6 +224,13 @@ Restart the server before trusting a "still failing" log.
 - **`announce()` in `useToastStore`** is how non-React code (the simulation
   tick) raises a transient message. `Notifications` is derived state for
   *ongoing* conditions; toasts are for *moments*. They are not interchangeable.
+
+- **Per-frame truth lives outside React, and `buildingActivity` is now part of
+  that set** alongside `occupancy` and `constructionProgress`. The simulation is
+  its only writer. Read it with `activityOf(id)`, and prefer
+  `structureStatus()` in `buildings/status.ts` over reading the raw record —
+  that module owns every user-facing word about what a structure is doing, so
+  there is one place for the wording rules to live.
 - **Doctrine is applied in `initialise()`**, not on the new-game screen, so a
   reset rebuilds the same start from the profile.
 - **`window.kryonisDebug`** (dev builds only) has `sols`, `setTimeOfDay()`,

@@ -203,6 +203,19 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     buildParts: corridorParts,
   },
 
+  /*
+   * The road, as a catalog entry.
+   *
+   * Roads used to exist twice and behave differently in each place: as a card
+   * in the build deck, which stamped the occupancy grid and blocked the tile,
+   * and as the drag-paint road tool, which wrote only the network grid and
+   * blocked nothing. A player could lay the "same" road two ways and get two
+   * different colonies.
+   *
+   * There is now one way to lay a road - the road tray, `roadGrades.ts` - and
+   * this entry survives only so that saves written before that change still
+   * load. It is not placeable, so it never reaches the deck.
+   */
   road: {
     id: 'road',
     name: 'Service Road',
@@ -220,7 +233,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     output: {},
     storage: {},
     maxRelief: 1.0,
-    placeable: true,
+    placeable: false,
     requires: [],
     buildParts: roadParts,
   },

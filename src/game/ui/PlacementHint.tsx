@@ -1,7 +1,10 @@
 'use client';
 
 import { BUILDINGS } from '../buildings/catalog';
+import { formatAmount } from '../core/resources';
 import { useBuildStore } from '../state/useBuildStore';
+import { useRoadStore } from '../state/useRoadStore';
+import { ROAD_GRADES } from '../world/roadGrades';
 
 /**
  * Placement feedback.
@@ -16,6 +19,36 @@ export function PlacementHint() {
   const hint = useBuildStore((state) => state.hint);
   const rotate = useBuildStore((state) => state.rotate);
   const cancel = useBuildStore((state) => state.cancel);
+  const grade = useRoadStore((state) => state.grade);
+
+  /*
+   * The road tool needs the same line the build tool gets.
+   *
+   * It is a drag rather than a click, which is not obvious, and the two things
+   * a player has to know - that dragging paints a run, and that dragging back
+   * over your own work lifts it - were previously only in a tooltip on a button
+   * they had already stopped looking at.
+   */
+  if (tool === 'road') {
+    const def = ROAD_GRADES[grade];
+    return (
+      <div className="glass anim-rise pointer-events-auto flex items-center gap-3 rounded-full px-4 py-1.5">
+        <span className="t-sm text-bone">{def.name}</span>
+        <span className="rule-y h-3.5" />
+        {hint ? (
+          <span className="t-sm text-alert">{hint}</span>
+        ) : (
+          <span className="t-sm text-ash">
+            Drag to lay · {formatAmount(def.cost)} a tile
+            {grade === 2 ? ` · ${formatAmount(def.upgradeCost)} to seal an existing road` : ''}
+          </span>
+        )}
+        <button type="button" onClick={cancel} className="t-micro press hover:text-bone">
+          Esc
+        </button>
+      </div>
+    );
+  }
 
   if (tool === 'demolish') {
     return (

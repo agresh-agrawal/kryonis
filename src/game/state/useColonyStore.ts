@@ -25,7 +25,7 @@ import {
   upgradeCost,
   type BuildingId,
 } from '../buildings/catalog';
-import { setRoad } from '../world/roads';
+import { hasRoad } from '../world/roads';
 import { currentDoctrine } from './useProfileStore';
 import { useProgressStore } from './useProgressStore';
 import {
@@ -446,6 +446,17 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
           return { valid: false, issue: 'occupied', message: 'Ground already occupied', tiles, groundY: 0 };
         }
 
+        /*
+         * Roads are not in the occupancy grid - they are a separate flat array,
+         * because the solver and the renderer both want them as a graph rather
+         * than as two hundred structures. That meant nothing stopped a habitat
+         * being dropped straight on top of a laid road: the tile read as empty,
+         * the building went up, and the road ran through its floor.
+         */
+        if (hasRoad(cx, cz)) {
+          return { valid: false, issue: 'occupied', message: 'A road runs through here', tiles, groundY: 0 };
+        }
+
         if (def.requiresTerrain && !def.requiresTerrain.includes(terrain.kind[index] as TerrainKind)) {
           allRequiredTerrain = false;
         }
@@ -499,15 +510,6 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
   },
 
   place: (terrain, type, tx, tz, rotation) => {
-    /*
-     * The Service Road in the build deck and the road grid are the same thing.
-     *
-     * Roads exist twice by necessity: as a catalog entry so they are
-     * discoverable in the build deck, and as a flat grid so the network solver
-     * and the renderer can treat them as a graph rather than as two hundred
-     * separate buildings. Placing one has to write both, or a road laid from
-     * the deck would look like a road and connect nothing.
-     */
     const check = get().checkPlacement(terrain, type, tx, tz, rotation);
     if (!check.valid) return false;
 
@@ -525,10 +527,6 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
     };
 
     if (building.progress < 1) constructionProgress.set(building.id, 0);
-
-    // The catalog entry and the utility grid are the same road. Writing only
-    // one of them would give a road that looks laid and carries nothing.
-    if (type === 'road') setRoad(tx, tz, true);
 
     set((state) => {
       const buildings = [...state.buildings, building];
@@ -548,11 +546,6 @@ export const useColonyStore = create<ColonyState>((set, get) => ({
   demolish: (id) => {
     constructionProgress.delete(id);
     set((state) => {
-      // Clearing the grid tile as well, or the network keeps routing power
-      // through a road that is no longer on the map.
-      const removed = state.buildings.find((building) => building.id === id);
-      if (removed?.type === 'road') setRoad(removed.tx, removed.tz, false);
-
       const buildings = state.buildings.filter((building) => building.id !== id);
       reindexOccupancy(buildings);
       return {

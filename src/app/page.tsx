@@ -143,6 +143,23 @@ export default function Page() {
   };
 
   /**
+   * Opens the construction deck straight onto the road tray.
+   *
+   * The grid chip in the right rail reports that two networks exist and only
+   * one of them is live; this is what turns that readout into something the
+   * player can act on without hunting for where roads live.
+   */
+  const openRoads = () => {
+    const build = useBuildStore.getState();
+    build.setTab('Roads');
+    // The tool has to be armed as well as the tray opened: the effect below
+    // closes the deck the moment the active tool is `select`, so opening it
+    // without picking anything up would shut it again on the same frame.
+    build.setTool('road');
+    setSection('build');
+  };
+
+  /**
    * Returns to the opening screen with nothing carried over.
    *
    * Every store that holds colony state is reset explicitly rather than by
@@ -259,23 +276,40 @@ export default function Page() {
 
           Sits below the settings button rather than beside it - both were
           previously anchored to the same corner, so opening settings dropped a
-          panel straight over the directives. The rail scrolls internally and is
-          height-capped so it can never reach the build deck either.
+          panel straight over the directives.
+
+          Order matters and is deliberate: the inspector is first because it is
+          the thing the player just clicked on, and a card that answers a
+          question you asked half a second ago must not be below the fold. The
+          two chips share a row - they are both two lines tall and stacking them
+          cost 5rem of a rail that was already overflowing on a laptop.
+
+          The rail is also height-capped against the *deck*, not against the
+          viewport: with the construction shelf open it stops 16rem short of the
+          bottom, which is the one case where the two used to meet.
         */}
         <div
-          className="rail-scroll absolute right-3 top-28 flex max-h-[calc(100dvh-9rem)] w-[min(17.5rem,calc(100vw-5rem))] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-1.5 min-[1180px]:right-4 min-[1180px]:top-32 min-[1180px]:max-h-[calc(100dvh-13rem)]"
+          className={`rail-scroll absolute right-3 top-28 flex w-[min(17.5rem,calc(100vw-5rem))] flex-col items-end gap-2 overflow-y-auto overflow-x-hidden pr-1.5 min-[1180px]:right-4 min-[1180px]:top-32 ${
+            deckOpen
+              ? 'max-h-[calc(100dvh-17rem)] min-[1180px]:max-h-[calc(100dvh-20rem)]'
+              : 'max-h-[calc(100dvh-9rem)] min-[1180px]:max-h-[calc(100dvh-11rem)]'
+          }`}
         >
-          <TerritoryChip onOpen={() => setSection('territory')} />
-          <RoadChip />
-          <DirectivePanel />
+          <div className="flex w-full flex-wrap items-start justify-end gap-2">
+            <TerritoryChip onOpen={() => setSection('territory')} />
+            <RoadChip onOpenRoads={openRoads} />
+          </div>
           <FloatingInspector />
+          <DirectivePanel />
         </div>
 
         {/*
           Bottom deck. Inset past the left column and the right rail so the
-          build shelf can never slide underneath either of them.
+          build shelf can never slide underneath either of them. The right inset
+          is the rail's own width plus its margin - it was a hair short before,
+          which let the widest cards slide under the inspector.
         */}
-        <div className="absolute bottom-3 left-[4.5rem] right-3 flex flex-col items-center gap-2 min-[1180px]:bottom-4 min-[1180px]:left-52 min-[1180px]:right-[18rem] min-[1180px]:gap-3">
+        <div className="absolute bottom-3 left-[4.5rem] right-3 flex flex-col items-center gap-2 min-[1180px]:bottom-4 min-[1180px]:left-52 min-[1180px]:right-[19.5rem] min-[1180px]:gap-3">
           <PlacementHint />
           {deckOpen ? <BuildDeck onDismiss={closeDeck} /> : null}
         </div>

@@ -227,13 +227,13 @@ export function ductStub(
   return geo;
 }
 
-/** Every laid tile, as `[tx, tz]`. */
+/** Every laid tile, as `[tx, tz, grade]`. */
 export function forEachRoadTile(
   grid: Uint8Array,
-  visit: (tx: number, tz: number) => void,
+  visit: (tx: number, tz: number, grade: number) => void,
 ): void {
   for (let index = 0; index < grid.length; index++) {
-    if (grid[index] !== 1) continue;
-    visit(index % REGION_TILES, (index / REGION_TILES) | 0);
+    if (grid[index] === 0) continue;
+    visit(index % REGION_TILES, (index / REGION_TILES) | 0, grid[index]);
   }
 }
