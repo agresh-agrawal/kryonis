@@ -160,6 +160,31 @@ Not finished: the onboarding tutorial, and the Exchange/trade screen.
 
 ---
 
+## Deploying
+
+The app is a standard Next.js project with no backend, no database and no
+environment variables, so it deploys as-is.
+
+**Vercel (via GitHub):**
+
+1. <https://vercel.com/new> → import `agresh-agrawal8/kryonis`.
+2. Accept the detected settings. Framework is Next.js; build is `next build`;
+   there is nothing to configure and no environment variables to set.
+3. Deploy. Every push to `master` then redeploys automatically.
+
+**Custom domain:**
+
+1. In the Vercel project → Settings → Domains, add the hostname.
+2. Vercel will show a DNS record to create. For a subdomain this is a `CNAME`
+   pointing at `cname.vercel-dns.com`.
+3. Add that record at whoever hosts DNS for the apex domain. Propagation is
+   usually minutes; Vercel issues the TLS certificate on its own once the
+   record resolves.
+
+Node 20+ is required at build time.
+
+---
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
