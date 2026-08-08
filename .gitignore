@@ -1,8 +1,18 @@
 node_modules/
 .next/
-out/
-build/
-dist/
+
+# ---------------------------------------------------------------------------
+# Build output, anchored to the repository root.
+#
+# The leading slash is load-bearing. Written as "build/", the pattern matches a
+# directory of that name at *any* depth - which silently excluded the game's
+# own src/game/build/ source directory. Everything still compiled locally
+# because the files were on disk, and the failure only surfaced on a clean
+# clone in CI, where the imports could not be resolved.
+# ---------------------------------------------------------------------------
+/out/
+/build/
+/dist/
 
 *.tsbuildinfo
 next-env.d.ts
