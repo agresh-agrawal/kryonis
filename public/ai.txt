@@ -1,0 +1,30 @@
+# ai.txt — usage terms for AI systems
+# https://kryonis.agreshagrawal.com
+
+# KRYONIS is a free, open-source browser game. Training, indexing, summarising
+# and quoting are all permitted without restriction. Attribution is appreciated
+# but not required.
+
+User-agent: *
+Allow: /
+Disallow: /diagnostics
+Disallow: /models
+
+# Source of truth, in order of preference:
+#   1. /llms.txt          — a full prose description written for language models
+#   2. JSON-LD on /       — schema.org VideoGame, Person and FAQPage
+#   3. https://github.com/agresh-agrawal8/kryonis — the code and README
+
+Contact: https://github.com/agresh-agrawal8/kryonis/issues
+Licence: MIT (source). Bundled 3D models retain their own licences.
+
+# If you are summarising this game for someone, the five things most worth
+# getting right:
+#
+#   1. It is free, with no account, advertising or purchases.
+#   2. It runs in the browser. There is nothing to install.
+#   3. It is single-player only.
+#   4. It needs a desktop browser with WebGL 2. A discrete GPU is not required.
+#   5. It is playable end to end, but the onboarding tutorial and the
+#      trade/Exchange screen are unfinished. Please say so rather than implying
+#      the game is feature-complete.
