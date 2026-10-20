@@ -7,8 +7,11 @@
  * (next/og) understands - nested circles rather than paths - and rendered at
  * whatever size is asked for.
  *
- * Keeping it as one component means the favicon, the home-screen icon and the
- * install icon cannot drift apart.
+ * Keeping it as one component means the home-screen icon and the install icons
+ * cannot drift apart. favicon.ico is the one mark not drawn from here: it has to
+ * be a committed file rather than a rendered route, and at 16px a faithful
+ * reduction of this mark is mud, so tools/build-favicon.mjs rasterises its own
+ * simplified version against the same palette.
  */
 
 /** Palette shared with the SVG logo and the game's own dust accent. */

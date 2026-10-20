@@ -142,6 +142,14 @@ Most of what you see is generated at runtime: terrain, textures (drawn into
 canvases from periodic value noise), and the procedural structure models. A
 small set of GLB models in `public/models` is built by `tools/build-models.mjs`.
 
+Icons are generated too. `src/app/brand.tsx` holds the mark as a component that
+`next/og` renders on demand into the Apple touch icon and the 192, 512 and
+maskable install icons, so none of them can drift apart. `favicon.ico` is the
+exception: it is requested blind at a fixed path by clients that never read the
+document head, so it has to be a committed file. `tools/build-favicon.mjs`
+rasterises it at 16, 32 and 48px using nothing but Node's own zlib — run it
+after changing the palette.
+
 Large binaries — source video, raw model downloads, archives — are gitignored.
 Git keeps every version of a binary forever, so a file deleted from the working
 tree still costs its full size in the pack for the life of the project. This

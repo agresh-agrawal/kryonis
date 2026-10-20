@@ -61,9 +61,19 @@ export const metadata: Metadata = {
   /*
    * Icons are declared rather than left to convention alone.
    *
-   * Next links the files it finds, but being explicit documents which slot each
-   * one serves - and the Apple entry matters because iOS cannot use the SVG at
-   * all and would otherwise fall back to a screenshot of a black canvas.
+   * The SVG is what every current browser actually displays, and the Apple entry
+   * matters because iOS cannot use SVG touch icons at all - without it, saving
+   * the site to a home screen yields a screenshot of a black WebGL canvas.
+   *
+   * Two icons that exist are deliberately absent from this list:
+   *
+   *   - app/favicon.ico is linked by Next's own file convention, so declaring it
+   *     here as well emits the same href twice. It earns its place in the build
+   *     by being requested blind at a fixed path by clients that never read the
+   *     head - feed readers, link unfurlers, crawler fallbacks - not by being
+   *     advertised in it.
+   *   - The 192 and 512 install icons are the manifest's business. Linking them
+   *     here would only add requests for icons no browser asks the head for.
    */
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
