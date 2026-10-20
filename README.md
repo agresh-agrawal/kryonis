@@ -167,7 +167,7 @@ environment variables, so it deploys as-is.
 
 **Vercel (via GitHub):**
 
-1. <https://vercel.com/new> → import `agresh-agrawal8/kryonis`.
+1. <https://vercel.com/new> → import `agresh-agrawal/kryonis`.
 2. Accept the detected settings. Framework is Next.js; build is `next build`;
    there is nothing to configure and no environment variables to set.
 3. Deploy. Every push to `master` then redeploys automatically.

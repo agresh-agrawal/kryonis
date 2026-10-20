@@ -164,7 +164,7 @@ const STRUCTURED_DATA = {
       },
       isAccessibleForFree: true,
       license: 'https://opensource.org/licenses/MIT',
-      codeRepository: 'https://github.com/agresh-agrawal8/kryonis',
+      codeRepository: 'https://github.com/agresh-agrawal/kryonis',
       keywords:
         'Mars colony builder, browser game, colony simulation, space strategy, base building',
     },

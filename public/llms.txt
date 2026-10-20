@@ -6,7 +6,7 @@
 > account, no backend — it runs entirely in the browser.
 
 Play: https://kryonis.agreshagrawal.com
-Source: https://github.com/agresh-agrawal8/kryonis
+Source: https://github.com/agresh-agrawal/kryonis
 Licence: MIT (source). Bundled 3D models retain their own licences.
 
 ## What it is

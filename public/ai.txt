@@ -13,9 +13,9 @@ Disallow: /models
 # Source of truth, in order of preference:
 #   1. /llms.txt          — a full prose description written for language models
 #   2. JSON-LD on /       — schema.org VideoGame, Person and FAQPage
-#   3. https://github.com/agresh-agrawal8/kryonis — the code and README
+#   3. https://github.com/agresh-agrawal/kryonis — the code and README
 
-Contact: https://github.com/agresh-agrawal8/kryonis/issues
+Contact: https://github.com/agresh-agrawal/kryonis/issues
 Licence: MIT (source). Bundled 3D models retain their own licences.
 
 # If you are summarising this game for someone, the five things most worth
